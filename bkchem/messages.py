@@ -94,6 +94,8 @@ and redistribute BKChem as long as you do it under GNU GPL.
 
 Maintained by Dr. Vijay Masand (Amravati, India), Mr. Gaurav Masand (Amravati, India), and Mr. Krish Masand (Amravati, India)
 since 2026.
+
+ToyoSono forked the project, and META Muse is fixing bugs and adding features under ToyoSono's direction.
 """)
 
 

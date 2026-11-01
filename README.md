@@ -25,7 +25,8 @@ This version of BKChem includes significant updates to ensure compatibility with
     - Modernized the internal **Piddle** graphics library to correctly handle binary file I/O in Python 3.
 - **Text Rendering Stability**: Fixed a persistent crash (`NoneType object is not iterable`) in the `ftext` engine when handling charges or single-character labels.
 - **Modern I/O**: Shifted to standard binary file handling for all PDF and PostScript generation.
-
+- **SVG image via clipboard**: "Selected to clipboard as SVG" send not only *text* but also *image/svg+XML* to clipboard so that MS Office can receive scalable figure. (by Muse and ToyoSono)
+- **Remove some bugs**: Retain the previous window size and language settings; retain changes made under Options->Standard Dialog; prevent inconsistencies when replacing “carbon” with “group”
 ## Requirements
 
 To run BKChem, you need Python 3.10 or higher and the following libraries:
@@ -34,18 +35,18 @@ To run BKChem, you need Python 3.10 or higher and the following libraries:
 - **Pmw** (Python MegaWidgets): `pip install Pmw`
 - **Pillow** (PIL Fork): `pip install Pillow`
 - **PyCairo** (Optional, for Cairo-based exports): `pip install pycairo`
-
+- **pyWin32** (to use win32clipboard.py): `pip install pywin32`
 ## Quick Start
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/vijaymasand/BKChem_python_3
+   git clone https://github.com/ToyoSono/BKChem_python_3
    cd BKChem_python_3
    ```
 
 2. **Install dependencies**:
    ```bash
-   pip install Pmw Pillow pycairo
+   pip install Pmw Pillow pycairo pywin32
    ```
 
 3. **Launch BKChem**:
@@ -70,3 +71,5 @@ BKChem is released under the **GNU General Public License (GPL)**. See the `bkch
 
 ---
 *Modernization and maintenance by Dr. Vijay Masand (Amravati, India), Gaurav Masand (Amravati, India), and Krish Masand (Amravati, India)*
+
+*Debugged and modefied by META Muse based on instructions of ToyoSono(Japan)*

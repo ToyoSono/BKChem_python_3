@@ -713,8 +713,7 @@ class standard_values_dialog:
       t = _('Custom')
     else:
       t = self.paper._paper_properties['type']
-    paper_types = data.paper_types.keys()
-    paper_types.sort()
+    paper_types = sorted( data.paper_types.keys())
     self.paper_type_chooser = Pmw.OptionMenu( paper_group,
                                               items=paper_types, #+[_('Custom')],
                                               initialitem = t,
@@ -976,7 +975,7 @@ class fragment_dialog( Pmw.Dialog):
 
 
   def clean( self):
-    map( self.paper.delete, self._items)
+    [self.paper.delete( i) for i in self._items]
     self._items = set()
 
 
