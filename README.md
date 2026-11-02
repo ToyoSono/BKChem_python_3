@@ -1,8 +1,17 @@
 # BKChem (Python 3 Modernized)
 
-**BKChem** is a free (open source) 2D molecular drawing program. It was originally developed by Beda Kosata and has been a staple in the open-source chemical informatics community for years. 
+**BKChem** is a free (open source) 2D molecular drawing program. It was originally developed by Beda Kosata and has been a staple in the open-source chemical informatics community for years.
 
-This repository contains a modernized version of BKChem, fully ported to **Python 3.10+** and stabilized for modern operating systems.
+This repository is **ToyoSono's fork** of [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3), which contains a modernized version of BKChem, fully ported to **Python 3.10+** and stabilized for modern operating systems. The fork adds a series of bug fixes and small features on top of it, developed under ToyoSono's direction by META Muse. See [What Changed in This Fork](#what-changed-in-this-fork) below.
+
+[日本語版 README はこちら](README_JP.md) / [日本語の変更履歴](CHANGELOG_JP.md)
+
+## Download for Windows
+
+Windows users do **not** need to install Python. Download **`BKChem-portable.zip`** from the [Releases page](https://github.com/ToyoSono/BKChem_python_3/releases), unzip it anywhere, and run **`BKChem.exe`** inside the unzipped folder.
+
+- Keep `BKChem.exe` together with the `_internal` folder next to it — the program will not start without it.
+- The executable is not code-signed, so Windows SmartScreen may show a warning on first run. Click "More info" and then "Run anyway" to start it.
 
 ## Key Features
 
@@ -15,27 +24,32 @@ This repository contains a modernized version of BKChem, fully ported to **Pytho
 - **Scalability**: Support for templates and user-defined fragment libraries.
 - **Plugin System**: Extensible architecture for custom exporters and importers.
 
-## Recent Modernization & Stability Fixes
+## What Changed in This Fork
 
-This version of BKChem includes significant updates to ensure compatibility with modern environments:
+Highlights of the fixes and changes made after forking:
 
-- **Python 3 Port**: Fully refactored from Python 2 to Python 3.10+, resolving all legacy syntax and library incompatibilities.
-- **Graphics Export Fixes**:
-    - Resolved critical `TypeError: a bytes-like object is required` crashes in Cairo-based exporters (PDF, SVG, PNG, PS).
-    - Modernized the internal **Piddle** graphics library to correctly handle binary file I/O in Python 3.
-- **Text Rendering Stability**: Fixed a persistent crash (`NoneType object is not iterable`) in the `ftext` engine when handling charges or single-character labels.
-- **Modern I/O**: Shifted to standard binary file handling for all PDF and PostScript generation.
-- **SVG image via clipboard**: "Selected to clipboard as SVG" send not only *text* but also *image/svg+XML* to clipboard so that MS Office can receive scalable figure. (by Muse and ToyoSono)
-- **Remove some bugs**: Retain the previous window size and language settings; retain changes made under Options->Standard Dialog; prevent inconsistencies when replacing “carbon” with “group”
+- **Settings now persist**: the menu language, window size, and values set in Options → Standard survive a restart. A startup crash on Tk 9 with Japanese menus is also fixed.
+- **Copy as SVG pastes as a picture**: "Selected to clipboard as SVG" now puts a real `image/svg+xml` image on the clipboard, so MS Word and similar applications paste a scalable vector figure instead of SVG source text.
+- **Impossible replacements are refused**: group substitution and atom-symbol changes that would exceed an atom's valency (for example putting COOH on a ring carbon) are now refused with a "Can not replace" message instead of showing a bond that is not really there. Undo also works reliably again.
+- **Broken features repaired**: ODF / OpenOffice Draw export, Align → Center horizontally/vertically, Chemistry → Check chemistry (it silently always reported "OK" before), deletion of plus signs, Fragment overview highlights, mouse-wheel zoom, and leftover bond decorations after 3D rotation.
+- **File dialogs remember the last folder**: Open / Save / Import / Export dialogs reopen in the folder you used last time instead of always starting in `C:\Windows\System32`.
+- **Portable build support**: `run_bkchem.py` and `bkchem.spec` are included so a portable Windows executable can be built with PyInstaller (see below).
+
+For details, see `CHANGELOG.md`. (日本語版は `CHANGELOG_JP.md`)
+
+The upstream version's own modernization work is described in the git history of [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3).
+
 ## Requirements
 
-To run BKChem, you need Python 3.10 or higher and the following libraries:
+To run BKChem from source (for the portable executable above, none of this is needed), you need Python 3.10 or higher and the following libraries:
 
 - **Tkinter**: (usually comes with Python)
 - **Pmw** (Python MegaWidgets): `pip install Pmw`
 - **Pillow** (PIL Fork): `pip install Pillow`
 - **PyCairo** (Optional, for Cairo-based exports): `pip install pycairo`
-- **pyWin32** (to use win32clipboard.py): `pip install pywin32`
+- **pyWin32** (to use win32clipboard.py, Windows only): `pip install pywin32`
+- **PyInstaller** (only if you want to build the portable executable): `pip install PyInstaller`
+
 ## Quick Start
 
 1. **Clone the repository**:
@@ -54,12 +68,29 @@ To run BKChem, you need Python 3.10 or higher and the following libraries:
    python start_bkchem.py
    ```
 
+## Building the Portable Windows Executable
+
+After steps 1–2 of Quick Start:
+
+4. **Install PyInstaller**:
+   ```bash
+   pip install PyInstaller
+   ```
+
+5. **Remove the `build` and `dist` folders if they exist** (leftovers from a previous build).
+
+6. **Build the executable**:
+   ```bash
+   python -m PyInstaller --noconfirm bkchem.spec
+   ```
+   Note: `bkchem.spec` builds with a console window (`console=True`) so that startup errors stay visible while developing. For a release build, set `console=False` in `bkchem.spec` first.
+
+7. The result is in the **`dist\BKChem`** folder: `BKChem.exe` together with an `_internal` folder. Both must stay together — to distribute it, zip the whole `dist\BKChem` folder (as `BKChem-portable.zip`) and attach the zip to a GitHub Release.
+
 ## Support & Contribution
 
 If you find this modernized version of BKChem helpful, please consider:
 - 🌟 **Giving it a Star** on GitHub to help others find it.
-- ☕ **Buying me a coffee** to support further development: 
-  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/vijaymasand)
 
 ## Documentation
 
@@ -72,4 +103,4 @@ BKChem is released under the **GNU General Public License (GPL)**. See the `bkch
 ---
 *Modernization and maintenance by Dr. Vijay Masand (Amravati, India), Gaurav Masand (Amravati, India), and Krish Masand (Amravati, India)*
 
-*Debugged and modefied by META Muse based on instructions of ToyoSono(Japan)*
+*Debugged and modified by META Muse based on instructions of ToyoSono (Japan)*
