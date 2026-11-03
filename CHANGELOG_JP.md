@@ -4,6 +4,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 2 — 2026-11-03
+
+### 修正（Fixed）
+
+- **図形を含むファイルが開けない**: 四角形・正方形・楕円・円を含む保存ファイルが、"object of type 'map' has no len()" エラーで読み込めませんでした。（`graphics.py`）
+- **設定ダイアログで現在のフォントが表示されない**: Object → Configure（右クリックの Properties）の Font タブで、使用中のフォント名が常に空白でした。対象を持たない選択でもタブが出てしまう問題もあわせて直しました。（`dialogs.py`）
+
 ## フォーク リリース 1 — 2026-11-02
 
 ### 修正（Fixed）

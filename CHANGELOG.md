@@ -4,6 +4,13 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 2 — 2026-11-03
+
+### Fixed
+
+- **Files containing shapes could not be reopened**: a saved file containing a rectangle, square, oval or circle failed to load with "object of type 'map' has no len()". (`graphics.py`)
+- **Configure dialog did not show the current font**: in Object → Configure (right-click Properties), the Font tab's family chooser never showed the text's actual font family, and tabs could also appear for selections that have no such objects. (`dialogs.py`)
+
 ## Fork release 1 — 2026-11-02
 
 ### Fixed
