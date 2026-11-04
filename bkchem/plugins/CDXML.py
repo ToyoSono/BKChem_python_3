@@ -57,9 +57,9 @@ class CDXML_importer( plugin.importer):
     # read colors
     colors=[]
     for elem7 in doc.getElementsByTagName("color"):
-      red=(float(elem7.getAttribute("r"))*255)
-      green=(float(elem7.getAttribute("g"))*255)
-      blue=(float(elem7.getAttribute("b"))*255)
+      red=int(float(elem7.getAttribute("r"))*255)
+      green=int(float(elem7.getAttribute("g"))*255)
+      blue=int(float(elem7.getAttribute("b"))*255)
       colors.append("#%02x%02x%02x" % (red,green,blue))
 
     # read fonts
@@ -160,7 +160,7 @@ class CDXML_importer( plugin.importer):
 
     for elem5 in doc.getElementsByTagName("t"):
       if elem5.parentNode.nodeName=="page":
-        position = map( float, elem5.getAttribute("p").split())
+        position = list( map( float, elem5.getAttribute("p").split()))
         assert len( position) == 2
         celyText=""
         for elem51 in elem5.childNodes:
@@ -203,7 +203,7 @@ class CDXML_importer( plugin.importer):
     # read graphics - plus
     for elem6 in doc.getElementsByTagName("graphic"):
       if elem6.getAttribute("GraphicType")=="Symbol" and elem6.getAttribute("SymbolType")=="Plus":
-        position = map( float, elem6.getAttribute("BoundingBox").split())
+        position = list( map( float, elem6.getAttribute("BoundingBox").split()))
         position2=[position[0],position[1]]
         assert len(position2) == 2
         if elem6.hasAttribute("color"):
@@ -224,8 +224,10 @@ class CDXML_importer( plugin.importer):
       sipka.insert(1,elem7.getAttribute('Tail3D') )
       if elem7.hasAttribute("color"): 
         sipka.insert(0,colors[(int(elem7.getAttribute("color"))-2)])
-      point1 = map( float, sipka[1].split())
-      point2 = map( float, sipka[2].split())
+      else:
+        sipka.insert(0,"#000000")
+      point1 = list( map( float, sipka[1].split()))
+      point2 = list( map( float, sipka[2].split()))
       arr = arrow( self.paper, points=[point2[0:2],point1[0:2]], fill=sipka[0])
       arr.line_color=sipka[0]
       molecules.append( arr)

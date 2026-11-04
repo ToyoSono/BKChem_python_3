@@ -20,6 +20,16 @@ Notes on the choices below:
   up at runtime, relative to the bkchem package directory:
   bkchem/pixmaps, bkchem/templates and bkchem/images inside the
   package, plus ../images, ../plugins and ../locale next to it.
+* The import/export plugins (bkchem/plugins/*.py) are loaded by
+  bkchem/plugins/__init__.py through importlib with module names taken
+  from a list, and every failure is silently swallowed - so
+  PyInstaller's static analysis never sees them and a naive build
+  produces an exe whose Import menu is empty and whose Export menu
+  has only the built-in SVG entry. The plugin modules are therefore
+  listed explicitly in hiddenimports below. (An explicit list is used
+  rather than collect_submodules() because collecting imports the
+  bkchem package, which needs a display and can silently return an
+  incomplete list in a headless build.)
 * win32clipboard / win32con are imported lazily inside
   paper.selected_to_real_clipboard_as_SVG() and
   selected_to_real_clipboard_as_image(), so static analysis does
@@ -43,7 +53,26 @@ datas = [
 hiddenimports = [
     'win32clipboard',
     'win32con',
-] + pmw_hiddenimports
+] + pmw_hiddenimports + [
+    # import/export plugins, loaded dynamically by bkchem/plugins/__init__.py
+    'bkchem.plugins.CDXML',
+    'bkchem.plugins.CML',
+    'bkchem.plugins.CML2',
+    'bkchem.plugins.openoffice',
+    'bkchem.plugins.ps_builtin',
+    'bkchem.plugins.molfile',
+    'bkchem.plugins.pdf_piddle',
+    'bkchem.plugins.ps_piddle',
+    'bkchem.plugins.pdf_cairo',
+    'bkchem.plugins.png_cairo',
+    'bkchem.plugins.odf',
+    'bkchem.plugins.svg_cairo',
+    'bkchem.plugins.ps_cairo',
+    'bkchem.plugins.image_export',
+    # base classes used by the piddle/cairo plugins
+    'bkchem.plugins.piddle_lowlevel',
+    'bkchem.plugins.cairo_lowlevel',
+]
 
 
 a = Analysis(
@@ -71,7 +100,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

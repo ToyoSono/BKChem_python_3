@@ -4,6 +4,13 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 3 — 2026-11-04
+
+### Fixed
+
+- **CDXML (ChemDraw XML) import failed**: files with a colour table raised an error while reading the colours, and files containing page text, plus symbols or arrows failed as well, so nothing was imported. All four spots are fixed. (`bkchem/plugins/CDXML.py`)
+- **Portable build: Import menu was empty and Export showed only SVG**: the import/export plugins are loaded dynamically by name, so PyInstaller's static analysis did not include them in the executable. The build spec now lists the plugin modules explicitly. (`bkchem.spec`)
+
 ## Fork release 2 — 2026-11-03
 
 ### Fixed
