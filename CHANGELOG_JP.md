@@ -4,6 +4,13 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 4 — 2026-11-05
+
+### 修正（Fixed）
+
+- **Molecular Descriptors で「Group:」の項目がすべて欠落していた**（水酸基・ベンゼン・カルボキシ基など）: 同梱の oasa 部分構造検索の中に Python 3 で壊れている箇所が5つあり、失敗が握りつぶされていたため、CSV に Group の列が出てきませんでした。あわせて、部分構造検索が座標を持たないテンプレート原子に描画用のプロパティを設定して落ちる問題（BKChem 側の原子クラス）も直しました。（`bkchem/oasa/oasa/common.py`、`bkchem/oasa/oasa/molecule.py`、`bkchem/atom.py`）
+- **実際のアプリケーションが書き出した CDXML の読み込みが失敗する**（ChemSketch の書き出しファイルで確認）: フォントサイズが小数で書かれている（例: `size="10.5"`）とエラーになる、「OH」のような通常の水素付きラベルで原子コード内の Python 3 残り（`dict_keys`）により落ちる、取り込み中の再描画でまだ描画されていない原子が落ちる、電荷のマイナスが長いダッシュ（ChemSketch の「O–」）で書かれていると電荷付き酸素ではなくただのテキストとして取り込まれる、の4点を直しました。（`bkchem/plugins/CDXML.py`、`bkchem/atom.py`）
+
 ## フォーク リリース 3 — 2026-11-04
 
 ### 修正（Fixed）

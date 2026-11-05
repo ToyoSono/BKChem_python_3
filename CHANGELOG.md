@@ -4,6 +4,13 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 4 — 2026-11-05
+
+### Fixed
+
+- **Molecular Descriptors silently omitted all "Group:" counts** (hydroxy group, benzene, carboxyl group, ...): five Python 3 breakages inside the bundled oasa substructure search made it fail, and the failure was swallowed, so the Group rows simply never appeared in the CSV. A sixth issue in BKChem's own atom class (the substructure search setting a drawing property on template atoms that have no coordinates) is fixed as well. (`bkchem/oasa/oasa/common.py`, `bkchem/oasa/oasa/molecule.py`, `bkchem/atom.py`)
+- **CDXML import failed on files written by real applications** (verified with a ChemSketch export): font sizes written as fractions (e.g. `size="10.5"`) raised an error; ordinary hydrogenated labels such as "OH" crashed in the atom code (a Python 3 `dict_keys` leftover); a redraw during import crashed for atoms not yet on the paper; and a charge written with a typographic minus (en-dash, as ChemSketch writes "O–") was imported as a plain text label instead of a charged oxygen atom. (`bkchem/plugins/CDXML.py`, `bkchem/atom.py`)
+
 ## Fork release 3 — 2026-11-04
 
 ### Fixed

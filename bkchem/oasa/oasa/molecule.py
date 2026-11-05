@@ -582,13 +582,13 @@ class molecule( graph.graph):
     for v in self.vertices:
       out[v] = [i for i in self._get_atom_distance_matrix( v)]
       v.properties_['distance_matrix'] = out[v]
-    ms = out.values()
+    ms = list( out.values())
     #self.remove_all_hydrogens()
     ms.sort()
     i = 1
     ret = []
     for m in ms:
-      ret.append( out.keys()[ out.values().index( m)])
+      keys = list( out.keys()); values = list( out.values()); ret.append( keys[ values.index( m)])
       #if ret.symbol != 'H':
       #  print "%3d: " % i, ret, ret.free_valency
       i += 1
@@ -748,7 +748,7 @@ class molecule( graph.graph):
   def _mark_matching_threads( self, v, other):
     """v is other vertex, other is the other molecule"""
     thread = 0
-    threads = v.properties_['subsearch'].keys()
+    threads = list( v.properties_['subsearch'].keys())
     while threads:
       thread = min( threads)
       threads.remove( thread)
@@ -810,7 +810,7 @@ class molecule( graph.graph):
     for i in range( max_thread +1, max_thread +number +1, 1):
       for v in my_vs + my_es + other_vs + other_es:
         v.properties_['subsearch'][ i] = v.properties_['subsearch'][thread]
-    return range( max_thread +1, max_thread +number +1, 1)
+    return list( range( max_thread +1, max_thread +number +1, 1))
 
 
 
@@ -977,9 +977,9 @@ class molecule( graph.graph):
     for v in vs:
       ret.append( str(v.properties_['distance_matrix']))
     res = "*".join( ret)
-    import sha
-    ss = sha.new()
-    ss.update( res)
+    import hashlib
+    ss = hashlib.sha1()
+    ss.update( res.encode())
     return ss.hexdigest()
 
   def create_CIP_digraph( self, center):

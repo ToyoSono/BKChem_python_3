@@ -51,7 +51,7 @@ def least_common_item( series):
   d = {}
   for i in series:
     d[i] = d.get( i, 0) + 1
-  return d.keys()[ d.values().index( min( d.values()))]
+  keys = list( d.keys()); values = list( d.values()); return keys[ values.index( min( values))]
 
 
     

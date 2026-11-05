@@ -147,6 +147,10 @@ class atom( drawable_chem_vertex, oasa.atom):
   # free-sites - replaces oasa.atom.free_sites
   def _set_free_sites( self, free_sites):
     self._free_sites = free_sites
+    if self.paper is None:
+      # atoms not attached to a paper (e.g. oasa-internal substructure
+      # templates) have nothing to draw marks on; just store the value
+      return
     marks = self.get_marks_by_type( "free_sites")
     if self._free_sites:
       if not marks:
@@ -279,7 +283,7 @@ class atom( drawable_chem_vertex, oasa.atom):
       form = PT.text_to_hydrogenated_atom( name)
       if form:
         # it is!
-        a = form.keys()
+        a = list( form.keys())
         a.remove( 'H')
         if occupied_valency == None:
           valency = self.occupied_valency
@@ -520,7 +524,10 @@ class atom( drawable_chem_vertex, oasa.atom):
   def update_after_valency_change( self):
     if self.free_valency <= 0:
       self.raise_valency_to_senseful_value()
-    if self.show_hydrogens:
+    if self.show_hydrogens and self.drawn:
+      # redraw only makes sense for atoms already drawn on a paper;
+      # off-paper atoms (e.g. while a plugin builds a molecule during
+      # import) have no canvas items and redraw() would fail on them
       self.redraw()
 
 

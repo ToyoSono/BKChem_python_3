@@ -94,9 +94,15 @@ class CDXML_importer( plugin.importer):
                     for (Id,Font) in fonts.items():
                       if Id==int(elem4.getAttribute("font")):
                         font=Font
-                    Size= int(elem4.getAttribute("size"))
+                    Size= int(float(elem4.getAttribute("size")))
                     text += dom_ext.getAllTextFromElement( elem4).strip()
-            
+
+            # Some exporters (e.g. ChemSketch) write charges in atom
+            # labels with a typographic minus (en-dash U+2013, em-dash
+            # U+2014, minus U+2212) instead of ASCII '-'; normalize it
+            # so that a label such as "O-" is parsed as a charged atom
+            # instead of falling back to a plain text atom
+            text = text.replace( "–", "-").replace( "—", "-").replace( "−", "-")
             position = elem2.getAttribute("p").split()
             assert len( position) == 2
             
@@ -195,7 +201,7 @@ class CDXML_importer( plugin.importer):
         t.line_color = color3
         #print elem51
         if elem51.hasAttribute("size"):
-          t.font_size = int( elem51.getAttribute("size"))
+          t.font_size = int( float( elem51.getAttribute("size")))
         if font:
           t.font_family = font
         molecules.append(t)
