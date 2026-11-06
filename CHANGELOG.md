@@ -4,6 +4,19 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 5 — 2026-11-06
+
+### Added / Changed
+
+- **SMILES stereochemistry (chirality) support**: Chemistry → Read SMILES now reads `@` / `@@` and draws each tetrahedral centre with a wedge (forward) or hash (back) bond; for ring centres the wedge is placed on a bond pointing out of the ring, so rings stay flat. The reverse direction works too: Chemistry → Generate SMILES emits `@` / `@@` from drawn wedge/hash bonds (the oasa parser kept the stereochemistry, but the bridge code dropped it). Known limitation: for fused-ring systems such as α-Thujone, Generate SMILES can return the mirror image because of a pre-existing problem in oasa's SMILES writer. (`bkchem/oasa_bridge.py`)
+
+### Fixed
+
+- **Generate SMILES crashed on molecules with both a stereocentre and a double bond** (e.g. Pyrethrin II) with `TypeError: unhashable type: 'explicit_hydrogen'`: the class defines `__eq__` without `__hash__`, which Python 3 makes unhashable. (`bkchem/oasa/oasa/stereochemistry.py`)
+- **Molfile export crashed for molecules containing a radical**: the radical atom numbers were still sorted with a Python 2 idiom. Export of ordinary molecules was unaffected. (`bkchem/oasa/oasa/molfile.py`)
+- **Chemistry → Read InChI failed even for neutral molecules**: the conversion loop's success condition could never become true on Python 3, so it always ended with "Localization of bonds, charges or movable hydrogens failed". Neutral molecules without stereochemistry now import (charged InChI still fails for a separate reason). (`bkchem/oasa/oasa/inchi.py`)
+- **Read SMILES crashed on a single-atom string** such as `C` or `O` (division by zero when a molecule has no bonds). (`bkchem/oasa_bridge.py`)
+
 ## Fork release 4 — 2026-11-05
 
 ### Fixed
@@ -31,7 +44,6 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 - **Preferences were lost on restart**: the menu language and window size reverted every time. Loading/saving of the preference file was repaired, and the loaded preferences are no longer discarded at startup. (`pref_manager.py`, `main.py`)
 - **Startup crash on Tk 9 with Japanese menus**: Pmw's menu hotkey handling crashed on Tk 9 when menu labels contain no alphanumeric characters (as in Japanese). BKChem now builds its menu bar without hotkeys. (`main.py`)
-- **"Selected to clipboard as SVG" pasted as text**: MS Word received the SVG source as text. On Windows the selection is now also registered as an `image/svg+xml` clipboard image, so Word pastes a scalable vector figure ("画像 (SVG)"). (`paper.py`)
 - **Group substitution showed bonds that were not really there**: replacing an atom with a group that cannot fit its valency (e.g. CHO on a ring carbon) displayed a bonded group while the internal data disagreed, and undo then failed or left the group on screen. Such replacements are now refused with a "Can not replace" error and nothing is changed; undo was also repaired (`inspect.getargspec` was removed in Python 3.11). (`context_menu.py`, `undo.py`, `group.py`, `export.py`, `marks.py`, `main.py`)
 - **Options → Standard dialog did not work**: it crashed while opening (sorting a Python 3 dict view), and its Save button always failed (Python 2 `file()`), so personal standard values never persisted. Both are fixed. (`dialogs.py`, `paper.py`)
 - **Mouse-wheel zoom crashed partway** when a scaled font size was missing from the tuning table, leaving text sizes inconsistent. (`tuning.py`)
@@ -45,6 +57,7 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 ### Added / Changed
 
+- **"Selected to clipboard as SVG" now also registers an image**: the SVG source used to be registered only as text. On Windows it is now also registered on the clipboard as an `image/svg+xml` image, so Word pastes it as a scalable vector figure ("画像 (SVG)"). (`paper.py`)
 - **File dialogs remember the last used folder**: Open / Save / Import / Export (and the Molecular Descriptors / Fingerprints file pickers) used to always start in `C:\Windows\System32`. They now reopen in the last used folder, also across restarts. (`main.py`, `descriptor_dialog.py`, `fingerprint_dialog.py`)
 - **About dialog**: added a credit line for this fork at the end of Help → About. (`messages.py`)
 - **Portable Windows build**: added `run_bkchem.py` (entry point) and `bkchem.spec` (PyInstaller spec) so a one-folder portable executable can be built; a naive PyInstaller build silently failed inside Pmw before. See README.md for the build steps.

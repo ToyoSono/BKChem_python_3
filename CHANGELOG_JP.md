@@ -4,6 +4,19 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 5 — 2026-11-06
+
+### 追加・変更（Added / Changed）
+
+- **SMILES の立体化学（キラル）に対応**: Chemistry → Read SMILES が `@` / `@@` を読み取り、キラル中心をウェッジ（手前）／ハッシュ（奥）結合で描くようになりました。環の中心では環の外に出る結合を優先してウェッジを付けるので、環は平面のまま表示されます。逆向きも対応し、Chemistry → Generate SMILES は描かれたウェッジ／ハッシュから `@` / `@@` を出力します（oasa が保持していた立体情報を、橋渡しコードが捨てていたのが原因でした）。既知の制限: α-Thujone のような縮環系では、oasa の SMILES 書き出し側の既存の問題により、Generate SMILES の結果が鏡像になる場合があります。（`bkchem/oasa_bridge.py`）
+
+### 修正（Fixed）
+
+- **キラル中心と二重結合を持つ分子で Generate SMILES が落ちる**: Pyrethrin II などで `TypeError: unhashable type: 'explicit_hydrogen'` が出ていました。`__eq__` だけを定義したクラスが Python 3 でハッシュ化できないためです。（`bkchem/oasa/oasa/stereochemistry.py`）
+- **ラジカルを含む分子の Molfile 書き出しで落ちる**: ラジカルの原子番号一覧の並べ替えが Python 2 の書き方のままでした。通常の分子の書き出しには影響ありません。（`bkchem/oasa/oasa/molfile.py`）
+- **Chemistry → Read InChI が中性分子でも失敗する**: 変換ループの成功条件が Python 3 では常に成り立たない書き方になっており、「Localization of bonds, charges or movable hydrogens failed」で終わっていました。中性・ステレオ指定なしの分子が取り込めるようになりました（電荷のある InChI は別の原因で未対応）。（`bkchem/oasa/oasa/inchi.py`）
+- **Read SMILES で原子1個だけの文字列が落ちる**: `C` や `O` のように結合のない分子でゼロ除算になっていました。（`bkchem/oasa_bridge.py`）
+
 ## フォーク リリース 4 — 2026-11-05
 
 ### 修正（Fixed）
@@ -31,7 +44,6 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 - **設定が再起動で消える**: メニュー言語とウィンドウサイズが毎回初期値に戻っていました。設定ファイルの読み書きを直し、起動時に読み込んだ設定が破棄されないようにしました。（`pref_manager.py`、`main.py`）
 - **Tk 9 ＋ 日本語メニューで起動時にクラッシュ**: 日本語ラベルのように英数字を含まないメニューでは Pmw のホットキー処理が Tk 9 で落ちました。BKChem 側でホットキーなしのメニューバーを使うようにしました。（`main.py`）
-- **「Selected to clipboard as SVG」がテキストとして貼り付く**: MS Word に SVG のソースが文字列として貼られていました。Windows では `image/svg+xml` 形式の画像としてもクリップボードに登録するようにし、Word に「画像 (SVG)」としてベクター図で貼れるようになりました。（`paper.py`）
 - **Group substitution で実際には結合していないのに結合して見える**: 原子の価数に収まらない基（例: 環の炭素に CHO）を置くと、見た目だけ結合した表示になり、内部データと食い違って Undo が失敗したり基が画面に残ったりしました。そのような置換は「Can not replace」エラーで拒否し、何も変更しないようにしました。あわせて Undo 自体も修正しました（Python 3.11 で削除された `inspect.getargspec` を使用していたため）。（`context_menu.py`、`undo.py`、`group.py`、`export.py`、`marks.py`、`main.py`）
 - **Options → Standard ダイアログが使えない**: 開く途中でクラッシュし（Python 3 の dict ビューのソート）、Save ボタンも常に失敗していた（Python 2 の `file()`）ため、個人用標準値が保存されませんでした。両方とも修正しました。（`dialogs.py`、`paper.py`）
 - **マウスホイールのズームで途中で落ちる**: 拡大後のフォントサイズが調整テーブルにない場合にエラーになり、文字サイズがばらばらになっていました。（`tuning.py`）
@@ -45,6 +57,7 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 ### 追加・変更（Added / Changed）
 
+- **「Selected to clipboard as SVG」で画像としても登録**: SVG のソースを文字列としてのみ登録していました。Windows では `image/svg+xml` 形式の画像としてもクリップボードに登録するようにしたので、Word に「画像 (SVG)」としてベクター図で貼れるようになりました。（`paper.py`）
 - **ファイルダイアログが前回のフォルダを記憶**: 開く / 保存 / インポート / エクスポート（および Molecular Descriptors / Fingerprints のファイル選択）が毎回 `C:\Windows\System32` から開いていました。再起動をまたいでも前回使ったフォルダで開くようになりました。（`main.py`、`descriptor_dialog.py`、`fingerprint_dialog.py`）
 - **About ダイアログ**: Help → About の末尾にこのフォークのクレジットを追加しました。（`messages.py`）
 - **Windows ポータブル版のビルド対応**: 起動用 `run_bkchem.py` と PyInstaller 用 `bkchem.spec` を追加し、フォルダ形式のポータブル実行ファイルを作れるようにしました（素朴なビルドでは Pmw の中で無言で失敗していました）。手順は README_JP.md を見てください。

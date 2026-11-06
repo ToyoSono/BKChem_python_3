@@ -112,3 +112,10 @@ class explicit_hydrogen( object):
       return True
     else:
       return False
+
+  # Python 3 sets __hash__ to None when __eq__ is defined, which made
+  # explicit_hydrogen unhashable; in Python 2 it stayed hashable by
+  # identity. molecule.detect_stereochemistry_from_coords() builds
+  # set( st.references), so Generate SMILES crashed on molecules with
+  # a tetrahedral centre (implicit H) and a double bond.
+  __hash__ = object.__hash__
