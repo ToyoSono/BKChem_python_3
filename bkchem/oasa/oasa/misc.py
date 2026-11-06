@@ -211,7 +211,10 @@ def gen_combinations( items, n):
 
 
 def x_over_y( x, y):
-  return factorial( x) / factorial( y) / factorial( x-y)
+  # a binomial coefficient is always an integer; with Python 3 '/'
+  # this returned a float, which later broke range() in the InChI
+  # reader ('float' object cannot be interpreted as an integer)
+  return factorial( x) // factorial( y) // factorial( x-y)
 
 
 def factorial( x):

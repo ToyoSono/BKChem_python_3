@@ -29,6 +29,99 @@ class coords_generator:
   def __init__( self, bond_length=1):
     self.bond_length = bond_length
 
+
+  # -- collision-aware placement helpers ------------------------------
+  # The generator grows the drawing atom by atom and historically never
+  # looked at the atoms placed already, so a chain could be drawn
+  # exactly back over an earlier part of the molecule (atoms landing
+  # at distance 0.0 from each other, looking fused in the drawing) and
+  # a ring could be placed on top of another fragment. The helpers
+  # below score a candidate placement by the crossings it would create
+  # and by its clearance from the placed atoms; the placement code
+  # uses them to take the mirrored alternative when that is clearly
+  # better. The original choice is kept unless the alternative wins
+  # by a margin, so layouts that were already good do not change.
+
+  def _clearance( self, x, y, exclude):
+    """distance from (x, y) to the closest placed atom not in exclude"""
+    best = None
+    for a in self.mol.vertices:
+      if a.x is None or a.y is None or a in exclude:
+        continue
+      d = sqrt( (a.x - x) ** 2 + (a.y - y) ** 2)
+      if best is None or d < best:
+        best = d
+    return best if best is not None else 9e9
+
+
+  def _count_crossings( self, x1, y1, x2, y2, exclude):
+    """how many placed bonds the segment (x1,y1)-(x2,y2) would cross;
+    bonds touching an atom in exclude do not count"""
+    def side( ax, ay, bx, by, px, py):
+      v = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+      if v > 0:
+        return 1
+      if v < 0:
+        return -1
+      return 0
+    count = 0
+    for e in self.mol.edges:
+      a1, a2 = e.vertices
+      if a1.x is None or a2.x is None or a1 in exclude or a2 in exclude:
+        continue
+      s1 = side( x1, y1, x2, y2, a1.x, a1.y)
+      s2 = side( x1, y1, x2, y2, a2.x, a2.y)
+      if s1 == 0 or s2 == 0 or s1 == s2:
+        continue
+      s3 = side( a1.x, a1.y, a2.x, a2.y, x1, y1)
+      s4 = side( a1.x, a1.y, a2.x, a2.y, x2, y2)
+      if s3 != 0 and s4 != 0 and s3 != s4:
+        count += 1
+    return count
+
+
+  def _better_placement( self, score_a, score_b):
+    """scores are (crossings, clearance); the alternative (b) wins
+    with fewer crossings, or with equal crossings and clearly more
+    clearance - but never when it would itself end in a close
+    approach to a placed atom"""
+    if score_b[0] != score_a[0]:
+      return (score_b[0] < score_a[0]
+              and score_b[1] >= 0.45 * self.bond_length
+              and score_b[1] >= score_a[1] - 0.3 * self.bond_length)
+    return score_b[1] > score_a[1] + 0.25 * self.bond_length
+
+
+  def _walk_positions( self, gen, start, count):
+    """the positions apply_gen_to_atoms() would produce, as a list"""
+    x, y = start.x, start.y
+    out = []
+    for i in range( count):
+      a = next( gen)
+      x += self.bond_length * cos( a)
+      y += self.bond_length * sin( a)
+      out.append( (x, y))
+    return out
+
+
+  def _walk_score( self, walk, start, ring):
+    """(crossings, clearance) of a ring walk starting at start"""
+    crossings = 0
+    clearance = None
+    px, py = start.x, start.y
+    prev = start
+    exclude = [start] + list( ring)
+    for (x, y), a in zip( walk, ring):
+      crossings += self._count_crossings( px, py, x, y, (prev, a))
+      c = self._clearance( x, y, exclude)
+      if clearance is None or c < clearance:
+        clearance = c
+      px, py = x, y
+      prev = a
+    # the bond closing the ring back to start
+    crossings += self._count_crossings( px, py, start.x, start.y, (prev, start))
+    return (crossings, clearance if clearance is not None else 9e9)
+
   def calculate_coords( self, mol, bond_length=0, force=0):
     """the bond_length (when given) sets the self.bond_length,
     if bond_length == -1 we suppose that there is already part of the molecule containing
@@ -160,8 +253,18 @@ class coords_generator:
             size = len( ring)+1
             da = deg_to_rad( 180 -180*(size-2)/size)
             gcoords = gen_angle_stream( da, start_from=ca-pi/2+da/2)
-            # here we generate the coords
-            self.apply_gen_to_atoms( gcoords, ring, v)
+            # the ring can equally well be drawn mirrored to the other
+            # side of the bond it grows from; take the mirror when it
+            # is clearly freer instead of placing the ring on top of
+            # an already drawn fragment
+            walk = self._walk_positions( gcoords, v, len( ring))
+            gcoords = gen_angle_stream( -da, start_from=ca+pi/2-da/2)
+            walk2 = self._walk_positions( gcoords, v, len( ring))
+            if self._better_placement( self._walk_score( walk, v, ring),
+                                       self._walk_score( walk2, v, ring)):
+              walk = walk2
+            for a, (x, y) in zip( ring, walk):
+              a.x, a.y = x, y
             ring.append( v)
             new_processed += ring
             new_processed += self.process_all_anelated_rings( ring)
@@ -257,6 +360,20 @@ class coords_generator:
       an = angle + deg_to_rad( angle_to_add)
       t.x = v.x + self.bond_length*cos( an)
       t.y = v.y + self.bond_length*sin( an)
+      if not placed and len( [a for a in t.get_neighbors() if a.x is not None]) == 1:
+        # the side was not dictated (no stereochemistry involved) and
+        # the atom hangs on this one bond only: if the mirrored
+        # direction is clearly freer, take it instead of drawing the
+        # chain back over the part that is already placed
+        an2 = 2 * angle - an
+        x2 = v.x + self.bond_length * cos( an2)
+        y2 = v.y + self.bond_length * sin( an2)
+        score_a = (self._count_crossings( v.x, v.y, t.x, t.y, (v, t)),
+                   self._clearance( t.x, t.y, (v, t)))
+        score_b = (self._count_crossings( v.x, v.y, x2, y2, (v, t)),
+                   self._clearance( x2, y2, (v, t)))
+        if self._better_placement( score_a, score_b):
+          t.x, t.y = x2, y2
       if len( to_go) > 1:
         self.process_atom_neigbors( v)
     else:
@@ -270,8 +387,22 @@ class coords_generator:
       angle = (angles[i] -angles[i+1]) / (len( to_go)+1)
       gcoords = gen_coords_from_stream( gen_angle_stream( angle, start_from=angles[i+1]+angle),
                                         length = self.bond_length)
-      for a in to_go:
-        dx, dy = next(gcoords)
+      offsets = [next( gcoords) for a in to_go]
+      if len( to_go) > 1:
+        # the fan of directions inside the gap is the same whichever
+        # end we start from, but which atom gets which direction is
+        # not: prefer the assignment whose closest approach to the
+        # placed atoms is clearly larger
+        def fan_clearance( offs):
+          worst = None
+          for dx, dy in offs:
+            c = self._clearance( v.x + dx, v.y + dy, [v] + list( to_go))
+            if worst is None or c < worst:
+              worst = c
+          return worst if worst is not None else 9e9
+        if fan_clearance( offsets[::-1]) > fan_clearance( offsets) + 0.25 * self.bond_length:
+          offsets.reverse()
+      for a, (dx, dy) in zip( to_go, offsets):
         a.x = v.x + dx
         a.y = v.y + dy
     return to_go

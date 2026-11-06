@@ -35,9 +35,366 @@ from .singleton_store import Screen
 from .oasa import transform3d
 
 
+def _resolve_coordinate_overlaps( mol):
+  """Repair atoms that the oasa coordinate generator stacked on top
+  of each other.
+
+  The generator places atoms on a triangular lattice (ring geometry
+  plus 120-degree chain steps) and never checks for collisions, so
+  in larger molecules a whole chain segment can land exactly on
+  another one (distance 0.0) and the two look fused in the drawing -
+  seen e.g. with vitamin K, troxerutin or alpha-tocopherol acetate,
+  by both the SMILES and the InChI readers. When, and only when,
+  some non-bonded atoms end up closer than about half a bond length,
+  run a small deterministic relaxation over the generated coords:
+  bonds are held near their generated length while too-close
+  non-bonded pairs are pushed apart. Molecules without overlaps are
+  returned completely untouched, and the atom order (hence the
+  stereochemistry handling built on it) never changes."""
+  atoms = list( mol.vertices)
+  if len( atoms) < 3 or None in [a.x for a in atoms] + [a.y for a in atoms]:
+    return
+  bonded = set()
+  for e in mol.edges:
+    v1, v2 = e.vertices
+    bonded.add( (id( v1), id( v2)))
+    bonded.add( (id( v2), id( v1)))
+  lengths = [math.hypot( e.vertices[0].x - e.vertices[1].x,
+                         e.vertices[0].y - e.vertices[1].y) for e in mol.edges]
+  if not lengths:
+    return
+  lengths.sort()
+  bond_length = lengths[len( lengths) // 2] or 1.0
+  trigger = 0.55 * bond_length
+  target = 0.75 * bond_length
+
+  def too_close():
+    out = []
+    for i in range( len( atoms)):
+      for j in range( i + 1, len( atoms)):
+        if (id( atoms[i]), id( atoms[j])) in bonded:
+          continue
+        d = math.hypot( atoms[i].x - atoms[j].x, atoms[i].y - atoms[j].y)
+        if d < trigger:
+          out.append( (i, j, d))
+    return out
+
+  if not too_close():
+    return
+  for _sweep in range( 500):
+    moved = False
+    # push too-close non-bonded pairs apart (half a correction per
+    # sweep keeps crowded clusters stable)
+    for i in range( len( atoms)):
+      for j in range( i + 1, len( atoms)):
+        if (id( atoms[i]), id( atoms[j])) in bonded:
+          continue
+        dx = atoms[j].x - atoms[i].x
+        dy = atoms[j].y - atoms[i].y
+        d = math.hypot( dx, dy)
+        if d >= target:
+          continue
+        moved = True
+        if d < 1e-9:
+          # exactly stacked atoms have no separating direction of
+          # their own; use a fixed pseudo-random one so that the
+          # result is the same on every run
+          ang = (((i + 1) * 73856093) ^ ((j + 1) * 19349663)) % 6283 / 1000.0
+          dx, dy, d = math.cos( ang), math.sin( ang), 1.0
+        push = 0.25 * (target - d) / d
+        atoms[i].x -= push * dx
+        atoms[i].y -= push * dy
+        atoms[j].x += push * dx
+        atoms[j].y += push * dy
+    # hold the bonds near their generated length
+    for e in mol.edges:
+      v1, v2 = e.vertices
+      dx = v2.x - v1.x
+      dy = v2.y - v1.y
+      d = math.hypot( dx, dy)
+      if d < 1e-9 or abs( d - bond_length) < 0.01 * bond_length:
+        continue
+      moved = True
+      pull = 0.15 * (d - bond_length) / d
+      v1.x += pull * dx
+      v1.y += pull * dy
+      v2.x -= pull * dx
+      v2.y -= pull * dy
+    if not moved:
+      break
+
+
+def _layout_terms( mol):
+  """Index-based view of an oasa molecule for the layout passes:
+  (atoms, bonds, angle_pairs, repel_pairs, median bond length).
+  angle_pairs are the 1-3 pairs whose distance sets a bond angle,
+  minus pairs fixed by a common ring and pairs that are bonded
+  themselves; repel_pairs are the non-bonded pairs that are not 1-3
+  related."""
+  atoms = list( mol.vertices)
+  index = {}
+  for i, a in enumerate( atoms):
+    index[id( a)] = i
+  bonds = []
+  neighbours = dict( (i, set()) for i in range( len( atoms)))
+  for e in mol.edges:
+    i, j = index[id( e.vertices[0])], index[id( e.vertices[1])]
+    bonds.append( (i, j))
+    neighbours[i].add( j)
+    neighbours[j].add( i)
+  bonded = set( bonds)
+  for i, j in bonds:
+    bonded.add( (j, i))
+  ring_pairs = set()
+  try:
+    cycles = mol.get_smallest_independent_cycles()
+  except Exception:
+    cycles = []
+  for cyc in cycles:
+    cyc = [index[id( a)] for a in cyc]
+    for a in range( len( cyc)):
+      for b in range( a + 1, len( cyc)):
+        ring_pairs.add( (cyc[a], cyc[b]))
+        ring_pairs.add( (cyc[b], cyc[a]))
+  dist2 = set()
+  for c in range( len( atoms)):
+    ns = sorted( neighbours[c])
+    for a in range( len( ns)):
+      for b in range( a + 1, len( ns)):
+        dist2.add( (ns[a], ns[b]))
+        dist2.add( (ns[b], ns[a]))
+  angle_pairs = [p for p in dist2 if p not in bonded and p not in ring_pairs]
+  repel_pairs = []
+  for i in range( len( atoms)):
+    for j in range( i + 1, len( atoms)):
+      if (i, j) not in bonded and (i, j) not in dist2:
+        repel_pairs.append( (i, j))
+  lengths = sorted( math.hypot( atoms[i].x - atoms[j].x,
+                                atoms[i].y - atoms[j].y) for i, j in bonds)
+  bond_length = lengths[len( lengths) // 2] if lengths else 1.0
+  return atoms, bonds, neighbours, angle_pairs, repel_pairs, bond_length
+
+
+def _layout_metrics( pos, bonds, neighbours):
+  """Quality measures of one layout, distances relative to the
+  median bond length: (min non-bonded distance, number of pairs
+  closer than 0.6, number closer than 0.85, number of bond
+  crossings, RMS bond-length deviation in %, mean absolute deviation
+  of bond angles from 120 degrees, number of chain angles below
+  100 degrees)."""
+  n = len( pos)
+  bonded = set( bonds)
+  for i, j in bonds:
+    bonded.add( (j, i))
+  blens = sorted( math.hypot( pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])
+                  for i, j in bonds)
+  med = blens[len( blens) // 2] if blens else 1.0
+  if med <= 0:
+    med = 1.0
+  min_nb = 9e9
+  severe = 0
+  close = 0
+  for i in range( n):
+    for j in range( i + 1, n):
+      if (i, j) in bonded:
+        continue
+      d = math.hypot( pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]) / med
+      if d < min_nb:
+        min_nb = d
+      if d < 0.6:
+        severe += 1
+      if d < 0.85:
+        close += 1
+  devs = []
+  for i, j in bonds:
+    l = math.hypot( pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]) / med
+    devs.append( (l - 1.0) ** 2)
+  bl_rms = 100.0 * math.sqrt( sum( devs) / len( devs)) if devs else 0.0
+
+  def in_ring( i):
+    ns = list( neighbours[i])
+    for a in range( len( ns)):
+      for b in range( a + 1, len( ns)):
+        if ns[b] in neighbours[ns[a]]:
+          return True
+    return False
+
+  ang_devs = []
+  sharp = 0
+  for i in range( n):
+    ns = sorted( neighbours[i])
+    for a in range( len( ns)):
+      for b in range( a + 1, len( ns)):
+        ux, uy = pos[ns[a]][0] - pos[i][0], pos[ns[a]][1] - pos[i][1]
+        vx, vy = pos[ns[b]][0] - pos[i][0], pos[ns[b]][1] - pos[i][1]
+        lu = math.hypot( ux, uy)
+        lv = math.hypot( vx, vy)
+        if lu < 1e-9 or lv < 1e-9:
+          continue
+        c = max( -1.0, min( 1.0, (ux * vx + uy * vy) / (lu * lv)))
+        ang = math.degrees( math.acos( c))
+        ang_devs.append( abs( ang - 120.0))
+        if len( ns) == 2 and not in_ring( i) and ang < 100.0:
+          sharp += 1
+  crossings = 0
+
+  def side( ax, ay, bx, by, px, py):
+    v = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+    return 1 if v > 0 else (-1 if v < 0 else 0)
+
+  for a in range( len( bonds)):
+    for b in range( a + 1, len( bonds)):
+      i, j = bonds[a]
+      k, l = bonds[b]
+      if len( set( (i, j, k, l))) < 4:
+        continue
+      s1 = side( pos[i][0], pos[i][1], pos[j][0], pos[j][1], pos[k][0], pos[k][1])
+      s2 = side( pos[i][0], pos[i][1], pos[j][0], pos[j][1], pos[l][0], pos[l][1])
+      if s1 == 0 or s2 == 0 or s1 == s2:
+        continue
+      s3 = side( pos[k][0], pos[k][1], pos[l][0], pos[l][1], pos[i][0], pos[i][1])
+      s4 = side( pos[k][0], pos[k][1], pos[l][0], pos[l][1], pos[j][0], pos[j][1])
+      if s3 != 0 and s4 != 0 and s3 != s4:
+        crossings += 1
+  return (min_nb, severe, close, crossings, bl_rms,
+          sum( ang_devs) / len( ang_devs) if ang_devs else 0.0, sharp)
+
+
+def _layout_score( met):
+  """One weighted quality score for a layout (lower is better);
+  used to keep the best state a layout pass has seen."""
+  min_nb, severe, close, crossings, bl_rms, ang_mad, sharp = met
+  return (500.0 * severe + 200.0 * max( 0.0, 0.8 - min_nb)
+          + 60.0 * crossings + 6.0 * close + 3.0 * sharp
+          + 20.0 * bl_rms + 0.8 * ang_mad)
+
+
+def _polish_layout( mol):
+  """Straighten a generated layout that is still tangled after the
+  overlap removal: constraint-projection sweeps in the style of
+  _resolve_coordinate_overlaps(), extended with bond-length and
+  bond-angle (1-3 distance) projection and an annealed repulsion
+  target - the sweeps start inflated so that tangled parts can slip
+  past each other, then settle. The best-scoring state seen is kept,
+  and the result is never allowed to end with severe clashes the
+  input did not have, so clean layouts pass through untouched (the
+  caller only invokes this when the layout needs it). Deterministic:
+  fixed iteration order throughout."""
+  atoms, bonds, neighbours, angle_pairs, repel_pairs, bond_length = _layout_terms( mol)
+  if len( atoms) < 3 or not bonds:
+    return
+  if None in [a.x for a in atoms] + [a.y for a in atoms]:
+    return
+  pos = [[a.x, a.y] for a in atoms]
+  met0 = _layout_metrics( pos, bonds, neighbours)
+  if met0[1] == 0 and met0[3] == 0 and met0[2] == 0 and met0[0] >= 0.95:
+    return  # nothing to polish
+  t13 = math.sqrt( 3.0) * bond_length
+  best = [p[:] for p in pos]
+  best_score = _layout_score( met0)
+
+  def push_apart( i, j, target, damp):
+    dx = pos[j][0] - pos[i][0]
+    dy = pos[j][1] - pos[i][1]
+    d = math.hypot( dx, dy)
+    if d >= target:
+      return
+    if d < 1e-9:
+      ang = (((i + 1) * 73856093) ^ ((j + 1) * 19349663)) % 6283 / 1000.0
+      dx, dy = math.cos( ang), math.sin( ang)
+      move = damp * target / 2.0
+      pos[i][0] -= move * dx
+      pos[i][1] -= move * dy
+      pos[j][0] += move * dx
+      pos[j][1] += move * dy
+      return
+    move = damp * (target - d) / (2.0 * d)
+    pos[i][0] -= move * dx
+    pos[i][1] -= move * dy
+    pos[j][0] += move * dx
+    pos[j][1] += move * dy
+
+  def project( i, j, target, damp):
+    dx = pos[j][0] - pos[i][0]
+    dy = pos[j][1] - pos[i][1]
+    d = math.hypot( dx, dy)
+    if d < 1e-9:
+      return
+    move = damp * (d - target) / (2.0 * d)
+    pos[i][0] += move * dx
+    pos[i][1] += move * dy
+    pos[j][0] -= move * dx
+    pos[j][1] -= move * dy
+
+  best_holder = [best_score, best]
+
+  def sweeps( count, rep_from, rep_to, damp_rep):
+    stale = 0
+    for sweep in range( count):
+      frac = sweep / max( 1, count - 1) if count > 1 else 1.0
+      rep_target = (rep_from + (rep_to - rep_from) * frac) * bond_length
+      for i, j in repel_pairs:
+        push_apart( i, j, rep_target, damp_rep)
+      for i, j in bonds:
+        project( i, j, bond_length, 0.5)
+      for i, j in angle_pairs:
+        project( i, j, t13, 0.35)
+      if sweep % 20 == 19 or sweep == count - 1:
+        sc = _layout_score( _layout_metrics( pos, bonds, neighbours))
+        if sc < best_holder[0]:
+          best_holder[0] = sc
+          best_holder[1] = [p[:] for p in pos]
+          stale = 0
+        else:
+          stale += 20
+          if stale >= 300:
+            break
+
+  sweeps( 300, 1.40, 0.92, 0.6)   # inflated: let tangles slip apart
+  sweeps( 400, 0.92, 0.92, 0.5)   # settle at the final distance
+  # one more settle run starting from the best state seen, to restore
+  # bond lengths and angles there without giving the gains back
+  pos = [p[:] for p in best_holder[1]]
+  sweeps( 150, 0.92, 0.92, 0.5)
+  best = best_holder[1]
+  met_best = _layout_metrics( best, bonds, neighbours)
+  if met_best[1] > met0[1] or met_best[0] < met0[0] - 0.05:
+    return
+  for a, (x, y) in zip( atoms, best):
+    a.x, a.y = x, y
+
+
+def _pick_best_layout( make_mol, tries):
+  """The coordinate generator's layout varies from parse to parse
+  (it iterates over sets of atoms), and while most layouts of a
+  larger molecule are usable, some fold a chain back over the rest
+  or place a ring on top of another fragment. Generate a few and
+  keep the best one by (severe clashes, crossings, close pairs,
+  min distance); stop early on a clean layout. Deterministic in
+  count and selection rule; exceptions from make_mol propagate."""
+  best = None
+  best_key = None
+  for _try in range( tries):
+    mol = make_mol()
+    atoms, bonds, neighbours, _ap, _rp, _bl = _layout_terms( mol)
+    pos = [[a.x, a.y] for a in atoms]
+    min_nb, severe, close, crossings = _layout_metrics( pos, bonds, neighbours)[:4]
+    key = (severe, crossings, close, -min_nb)
+    if best_key is None or key < best_key:
+      best, best_key = mol, key
+    if severe == 0 and crossings == 0 and min_nb >= 0.9:
+      break
+  return best
+
+
 def read_smiles( text, paper):
-  mol = oasa.smiles.text_to_mol( text)
-  oasa.coords_generator.calculate_coords( mol, bond_length=1.0, force=1)
+  def make_mol():
+    mol = oasa.smiles.text_to_mol( text)
+    oasa.coords_generator.calculate_coords( mol, bond_length=1.0, force=1)
+    return mol
+  mol = _pick_best_layout( make_mol, 6)
+  _resolve_coordinate_overlaps( mol)
+  _polish_layout( mol)
   m = oasa_mol_to_bkchem_mol( mol, paper)
   _apply_tetrahedral_stereochemistry( mol, m, _smiles_chiral_orders( text))
   return m
@@ -229,8 +586,11 @@ def _add_tetrahedral_stereochemistry_from_bonds( oasa_mol):
 
 
 def read_inchi( text, paper):
-  mol = oasa.inchi.text_to_mol( text, calc_coords=1, include_hydrogens=False)
-  #oasa.coords_generator.calculate_coords( mol, bond_length=1.0, force=1)
+  def make_mol():
+    return oasa.inchi.text_to_mol( text, calc_coords=1, include_hydrogens=False)
+  mol = _pick_best_layout( make_mol, 3)
+  _resolve_coordinate_overlaps( mol)
+  _polish_layout( mol)
   m = oasa_mol_to_bkchem_mol( mol, paper)
   return m
   

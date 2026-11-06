@@ -4,6 +4,15 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 6 — 2026-11-07
+
+### Fixed
+
+- **Chemistry → Read InChI now handles charged molecules**: acetate, formate and hydroxide used to be drawn as the wrong ion (charge +1 with one extra hydrogen — the sign was lost); methylammonium crashed; sulfur-containing molecules crashed even when neutral. 34 of 36 strict checks pass. Remaining limits: diborane and borohydride still fail cleanly (oasa valency model), nitrate still fails with the Localization error (oasa charge allocation), stereo (/t) layers are not yet reflected in the drawing, and multi-component (salt) InChI is still unsupported. (`bkchem/oasa/oasa/inchi.py`)
+- **Large molecules drawn from SMILES / InChI overlapped and looked fused**: oasa's coordinate generator never checked for collisions, so in vitamin K, troxerutin and α-tocopherol acetate whole chain segments landed exactly on top of other atoms (distance 0.0). The generator itself is now collision-aware and the cleanest of several candidate layouts is chosen, so all five test compounds on both routes now have 0 overlaps and 0 bond crossings. Streptomycin's InChI also failed for a separate reason (an integer-division leftover) and now reads (40 atoms). Remaining limits: α-tocopherol acetate and troxerutin can still have 1–2 crossings on unlucky layouts; Brilliant Blue FCF's InChI (a multi-component salt) is still unsupported by oasa. (`bkchem/oasa/oasa/coords_generator.py`, `bkchem/oasa_bridge.py`, `bkchem/oasa/oasa/misc.py`)
+- **Group substitution could place the new group on top of a neighbouring structure**: replacing a troxerutin hydroxy group with phenyl left a phenyl carbon 0.53 bond lengths from an atom of the neighbouring ring. After expansion, when a severe approach (below 0.6) exists, the new fragment is now rotated rigidly to a freer direction. In the reported example this moves 0.53 → 0.61, so the severe approach is gone — but it stays snug, because rotation alone cannot do better (a layout that reorients the whole molecule, as in the reference drawing, is beyond a local rotation). Substitutions without a clash are left exactly as before. (`bkchem/group.py`)
+- **Molfile export wrote a blank line before "M  END"**: every exported .mol file contained a stray empty line in the property block (a Python 3 `filter()` object is always truthy, so the "no property lines" case still wrote a line). Readers tolerate it, so no data was lost, but the file was not what the format specifies. (`bkchem/oasa/oasa/molfile.py`)
+
 ## Fork release 5 — 2026-11-06
 
 ### Added / Changed

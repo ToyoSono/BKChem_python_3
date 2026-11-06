@@ -197,7 +197,7 @@ class inchi( plugin):
 
       if repeat and self._no_possibility_to_improve and self.charge:
         try:
-          self.next(_charge_mover)
+          next(self._charge_mover)
         except StopIteration:
           pass
         else:
@@ -221,19 +221,27 @@ class inchi( plugin):
       raise oasa_not_implemented_error( "INChI", "multiple compound systems are not supported by the library")
 
     form = pt.formula_dict( self.layers[1])
-    processed_hs = 0 #for diborane and similar compounds we must process some Hs here
     j = 0
     for k in form.sorted_keys():
+      if k == 'H':
+        continue
       for i in range( form[k]):
-        if k == 'H':
-          # we want to process only the Hs that are not in the h-layer
-          if processed_hs >= form[k] - self.hs_in_hydrogen_layer:
-            continue
-          else:
-            processed_hs += 1
         j += 1
         a = self.structure.create_vertex()
         a.symbol = k
+        self.structure.add_vertex( a)
+        a.properties_['inchi_number'] = j
+    # hydrogens last: InChI numbers all heavy atoms first and hydrogens after them,
+    # so the Hs not covered by the h-layer (e.g. the bridging Hs of diborane) must
+    # be created here, after the heavy atoms, not in alphabetical order in the
+    # middle (which would shift every later atom number and corrupt the
+    # connectivity layer and the h-layer lookups)
+    if 'H' in form:
+      # we want to process only the Hs that are not in the h-layer
+      for i in range( max( 0, form['H'] - self.hs_in_hydrogen_layer)):
+        j += 1
+        a = self.structure.create_vertex()
+        a.symbol = 'H'
         self.structure.add_vertex( a)
         a.properties_['inchi_number'] = j
 
@@ -314,8 +322,8 @@ class inchi( plugin):
     if not layer:
       return
 
-    charge = int( layer[1:]) - self.forced_charge
-    self.charge = int( layer[1:])
+    charge = int( layer) - self.forced_charge
+    self.charge = int( layer)
 
 
     if charge > 0:
@@ -364,7 +372,7 @@ class inchi( plugin):
         assert steps < 10
 
         for v in self.structure.vertices:
-          if v.symbol != 'C' and not v.free_valency and filter( None, [n.free_valency for n in v.neighbors]):
+          if v.symbol != 'C' and not v.free_valency and list(filter( None, [n.free_valency for n in v.neighbors])):
             v.charge = charge
             charge = 0
             change = True
@@ -400,7 +408,7 @@ class inchi( plugin):
           break
 
     if charge:
-      raise oasa_exceptions.oasa_inchi_error( "The molecular charge could not be allocated to any atom (%d)." % charge)
+      raise oasa_inchi_error( "The molecular charge could not be allocated to any atom (%d)." % charge)
 
 
 
@@ -410,7 +418,7 @@ class inchi( plugin):
       return
 
 
-    p = int( layer[1:]) - self._protonation_dealt_with_already
+    p = int( layer) - self._protonation_dealt_with_already
     self.charge += p
     charges = self.forced_charge
     old_p = p
@@ -470,7 +478,7 @@ class inchi( plugin):
                 # the charge can normaly be delt with
                 v.charge -= 1
               break
-      assert p < old_p
+      assert abs( p) < abs( old_p)
 
 
   def read_double_bond_stereo_layer( self):
@@ -721,7 +729,7 @@ class inchi( plugin):
           if n.symbol == "O" and n.degree == 1:
             v.raise_valency()
             break
-      elif v.symbol == "S" and v.symbol > 2:
+      elif v.symbol == "S" and v.degree > 2:
         for n in v.neighbors:
           if n.symbol == "O" and n.degree == 1:
             v.raise_valency()

@@ -31,6 +31,7 @@ except ImportError:
 from . import groups_table as GT
 from .special_parents import drawable_chem_vertex
 from . import data
+import math
 import re
 from . import debug
 from . import marks
@@ -390,6 +391,7 @@ class group( drawable_chem_vertex):
     self.molecule.delete_vertex( self)
     if self.occupied_valency:
       oasa.coords_generator.calculate_coords( self.molecule, bond_length=-1)
+      self._relieve_expansion_clash( replacement)
     else:
       # if the group is the only vertex of the molecule we must set the bond_length explicitly
       # and the move the whole molecule
@@ -401,3 +403,115 @@ class group( drawable_chem_vertex):
       dy = y - replacement.y
       [a.move( dx, dy) for a in self.group_graph.vertices]
     return self.group_graph.vertices
+
+
+
+  def _relieve_expansion_clash( self, replacement):
+    """swing a freshly expanded group away from the rest of the molecule
+    when it was placed on top of it.
+
+    Expansion fits the group into the position and direction of the atom
+    it replaced, with ideal angles and no regard for the rest of the
+    molecule, so e.g. a phenyl replacing the peri hydroxyl of troxerutin
+    ends up with its edge carbons ~0.5 bond lengths from the neighbouring
+    ring. When (and only when) some atom of the new fragment comes closer
+    than 0.6 bond lengths to an atom outside the fragment, try rotating
+    the whole fragment rigidly around the atom it hangs on and keep the
+    first placement that is strictly better (fewest clashes, then fewest
+    bond crossings, then the largest remaining clearance). Two centres
+    are tried: the atom it hangs on (which swings the attachment bond
+    to a new direction) and the fragment's own attachment atom (which
+    keeps the attachment bond and only turns the fragment around it).
+    The second centre matters - on the troxerutin example no swing
+    around the hanging atom helps (best 0.53), while a 5 degree turn
+    around the attachment atom clears the clash (0.61). Rotation in
+    the plane is a proper rigid motion, so the fragment's own geometry
+    and stereochemistry are preserved; placements without a clash are
+    never touched, and small angles are tried first so the winning
+    placement distorts the ideal angles as little as possible."""
+    frag = list( self.group_graph.vertices)
+    frag_set = set( frag)
+    if replacement not in frag_set:
+      return
+    # the fragment must hang on exactly one atom of the original molecule
+    pivots = set()
+    for v in frag:
+      for n in v.get_neighbors():
+        if n not in frag_set:
+          pivots.add( n)
+    if len( pivots) != 1:
+      return
+    pivot = pivots.pop()
+    rest = [v for v in self.molecule.vertices if v not in frag_set]
+    if not rest or None in [v.x for v in frag] + [v.y for v in frag]:
+      return
+    lengths = []
+    for e in self.molecule.edges:
+      a1, a2 = e.atoms
+      lengths.append( math.hypot( a1.x - a2.x, a1.y - a2.y))
+    if not lengths:
+      return
+    lengths.sort()
+    bond_length = lengths[len( lengths) // 2] or 1.0
+    frag_bonds = [(e.atoms[0], e.atoms[1]) for e in self.molecule.edges
+                  if e.atoms[0] in frag_set and e.atoms[1] in frag_set]
+    frag_bonds.append( (pivot, replacement))
+    rest_bonds = [(e.atoms[0], e.atoms[1]) for e in self.molecule.edges
+                  if e.atoms[0] not in frag_set and e.atoms[1] not in frag_set]
+
+    def score( coords):
+      severe = 0
+      mind = None
+      for v in frag:
+        x, y = coords[v]
+        for u in rest:
+          if u is pivot and v is replacement:
+            continue # the attachment bond itself
+          d = math.hypot( x - u.x, y - u.y) / bond_length
+          if mind is None or d < mind:
+            mind = d
+          if d < 0.6:
+            severe += 1
+      cross = 0
+      for a1, a2 in frag_bonds:
+        p1 = coords[a1] if a1 in coords else (a1.x, a1.y)
+        p2 = coords[a2] if a2 in coords else (a2.x, a2.y)
+        for b1, b2 in rest_bonds:
+          if _segments_cross( p1, p2, (b1.x, b1.y), (b2.x, b2.y)):
+            cross += 1
+      return (severe, cross, -(mind or 0.0))
+
+    original = dict( [(v, (v.x, v.y)) for v in frag])
+    best = score( original)
+    if best[0] == 0:
+      return # nothing is clashing - leave the placement alone
+    best_coords = None
+    for angle in (5, -5, 10, -10, 15, -15, 30, -30, 45, -45, 60, -60,
+                  90, -90, 120, -120, 150, -150, 180):
+      for cx, cy in ((replacement.x, replacement.y), (pivot.x, pivot.y)):
+        rad = math.radians( angle)
+        cosr, sinr = math.cos( rad), math.sin( rad)
+        rotated = {}
+        for v in frag:
+          dx, dy = v.x - cx, v.y - cy
+          rotated[v] = (cx + dx * cosr - dy * sinr,
+                        cy + dx * sinr + dy * cosr)
+        s = score( rotated)
+        if s < best:
+          best = s
+          best_coords = rotated
+    if best_coords is not None:
+      for v in frag:
+        v.x, v.y = best_coords[v]
+
+
+
+def _segments_cross( p1, p2, p3, p4):
+  """True when the segments p1p2 and p3p4 cross in their interiors"""
+  def orient( a, b, c):
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+  d1 = orient( p3, p4, p1)
+  d2 = orient( p3, p4, p2)
+  d3 = orient( p1, p2, p3)
+  d4 = orient( p1, p2, p4)
+  return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))

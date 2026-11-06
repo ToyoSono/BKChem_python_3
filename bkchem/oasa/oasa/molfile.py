@@ -200,7 +200,7 @@ class molfile( plugin):
     else:
       rad_line = None
     # return m_lines
-    m_lines = filter( None, [rad_line])
+    m_lines = list( filter( None, [rad_line]))
     return m_lines
 
   def _read_molfile_charge( self, value):
