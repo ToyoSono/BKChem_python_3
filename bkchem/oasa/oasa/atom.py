@@ -27,6 +27,7 @@ from .common import is_uniquely_sorted
 from .oasa_exceptions import oasa_invalid_atom_symbol
 
 import copy
+import functools
 import itertools
 from warnings import warn
 
@@ -262,7 +263,7 @@ class atom( chem_vertex):
     while not is_uniquely_sorted( cips, cip_sorting_function):
       for cip in cips:
         try:
-          cip[0].append( cip[2].next().symbol_number)
+          cip[0].append( next( cip[2]).symbol_number)
         except StopIteration:
           cip[0].append( None)
         except AttributeError:
@@ -271,7 +272,7 @@ class atom( chem_vertex):
       for i in range( len( cips)-1):
         if cip_sorting_function( cips[i], cips[i+1]) == 0 and cips[i][0][-3:-1] == [None, None]:
           return False
-      cips.sort( cip_sorting_function)
+      cips.sort( key=functools.cmp_to_key( cip_sorting_function))
     return True
 
 
@@ -285,7 +286,7 @@ class atom( chem_vertex):
     while not is_uniquely_sorted( cips, cip_sorting_function):
       for cip in cips:
         try:
-          cip[0].append( cip[2].next().symbol_number)
+          cip[0].append( next( cip[2]).symbol_number)
         except StopIteration:
           cip[0].append( None)
         except AttributeError:
@@ -298,7 +299,7 @@ class atom( chem_vertex):
             all_finished = 0
       if all_finished:
         break # it can't be uniquely sorted, we are out of atoms
-      cips.sort( cip_sorting_function)
+      cips.sort( key=functools.cmp_to_key( cip_sorting_function))
     return [cip[1] for cip in cips]
 
 
@@ -318,7 +319,7 @@ class atom( chem_vertex):
       neighs.remove( came_from)
     # end if there are no neighs
     if not neighs:
-      raise StopIteration
+      return
     # generators of the neighs
     cips = []
     for a in neighs:
@@ -336,7 +337,7 @@ class atom( chem_vertex):
         cip[1] += cs
         cip[0] += [c.symbol_number for c in cs]
       [cips.remove( cip) for cip in to_remove]
-      cips.sort( cip_sorting_function)
+      cips.sort( key=functools.cmp_to_key( cip_sorting_function))
       for cip in cips:
         for i in range( cip[3], len( cip[1])):
           yield cip[1][i]
@@ -351,7 +352,13 @@ class atom( chem_vertex):
 
 
 def cip_sorting_function( a, b):
-  return -cmp( a[0], b[0])
+  # descending order by the CIP number list; None (end of a branch) sorts
+  # below any atomic number, as in Python 2 where None compared smallest
+  ka = [ -1 if x is None else x for x in a[0]]
+  kb = [ -1 if x is None else x for x in b[0]]
+  if ka == kb:
+    return 0
+  return 1 if ka < kb else -1
 
 
 

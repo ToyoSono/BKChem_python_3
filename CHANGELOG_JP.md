@@ -4,6 +4,22 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 7 — 2026-11-08
+
+### 追加・変更（Added / Changed）
+
+- **Chemistry → Generate InChI が使えるようになりました**: もともと公式 InChI プログラムを外部実行する設計でしたが、Python 3 ではプログラムを正しく設定しても失敗していました（subprocess に文字列のまま渡していたため）。また InChI 1.07 は従来の STDIO オプション形式を受け付けなくなったため、呼び出しを一時ファイル経由に変えました。パスが間違っている場合は「Unknown error」ではなく専用のエラーダイアログが出ます。設定方法: IUPAC-InChI の GitHub リリースから InChI ソフトウェア（v1.07 以降、MIT ライセンス）を入手し、Options → InChI program path で自分の OS 用の `inchi-1.exe` / `inchi-1` を指定してください（README の「Generate InChI について」参照）。InChI 1.07.5 でエタノール、酢酸イオン、L-アラニン（立体化学を含む)、トロキセルチンで確認済みです。（`bkchem/oasa/oasa/inchi.py`）
+- **CML インポートの向きが他の形式と揃いました**: CML ファイルは、同じ構造を MOL で読み込んだ場合と上下が鏡像になって描かれていました。BKChem が書き出した CML も他のエディタで開くと反転していました。インポート・エクスポートとも y 座標を対称に反転するよう統一し、CML2 インポーターは Ketcher の `<bondStereo>` 要素を読むようになりました（従来はくさび/ハッシュ結合がすべて無言で落ちていました）。注意: この修正より前に BKChem が書き出した CML ファイルは、今後は反転して読み込まれます。（`bkchem/plugins/CML.py`、`bkchem/plugins/CML2.py`)
+
+### 修正（Fixed）
+
+- **Ketcher の MDL MOL V3000 ファイルが読み込めませんでした**: oasa の molfile リーダーは V2000 しか理解できず、V3000 ファイルを原子 0 個の分子として読み、インポートプラグインがクラッシュしていました。V3000 リーダー（原子/結合ブロック、電荷、結合の立体）を追加し、まったく解析できないファイルはクラッシュではなく通常のインポートエラーになるようにしました。（`bkchem/oasa/oasa/molfile.py`、`bkchem/plugins/molfile.py`)
+- **CDXML エクスポートが他のプログラムで全結合と元素情報を失っていました**: 書き出した結合に `id` 属性がなく（ChemSketch は id のないオブジェクトを無言で捨てるため、孤立した原子だけが表示されました)、ヘテロ原子には `Element` 属性がなく、他のプログラムでは全原子が炭素として読まれていました。文書全体で一意な id、`Element` / `NodeType`、明示的な結合次数と電荷を書くようにし、インポーターも `Element` 属性を尊重するようになりました（反転した "HO" 水酸基ラベルがホルミウムとして往復することもなくなります）。（`bkchem/plugins/CDXML.py`)
+- **Ketcher の CML インポートが `KeyError: 'name'` でクラッシュしました**: インポーターは古い CML1 形式の子要素しか読めず、Ketcher の書く CML2 属性形式に対応していませんでした。さらに、通常なら丁寧にエラーになるはずの経路自体が存在しないフィールドを参照して壊れており、CML の cis/trans 立体表記は未知の結合タイプになって描画で落ちていました。3点とも直し、くさび/ハッシュの立体も保持されます。（`bkchem/plugins/CML.py`)
+- **oasa の CIP 優先順位コードが Python 3 で死んでいました**（組み込み `cmp` など削除された記法のため）: 優先順位の計算が再び動くようになりました。例: FC(Cl)(Br)I はキラルと判定され、優先順位は I > Br > Cl > F です。BKChem の機能からはまだ呼ばれていませんが、Python 3 対応の一環として直しました。（`bkchem/oasa/oasa/atom.py`)
+- **環状 SMILES の書き出し**: oasa の `is_pure_ring()` が `filter()` オブジェクトとリストを比較していたため、Python 3 では常に「純粋な環ではない」という答えになっていました。（`bkchem/oasa/oasa/smiles.py`)
+- **無言で誤動作する Python 3 の名残が2件**: 外部データモジュールの型チェックが常に合格になっていて（`filter()` オブジェクトは常に真）、不正な値が無言で通っていました。また oasa の misc モジュール内の未使用ヘルパー3件が、呼ばれると NameError / TypeError になる状態でした。（`bkchem/external_data.py`、`bkchem/oasa/oasa/misc.py`)
+
 ## フォーク リリース 6 — 2026-11-07
 
 ### 修正（Fixed）

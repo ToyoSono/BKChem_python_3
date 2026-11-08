@@ -111,7 +111,7 @@ def split_number_and_unit( txt):
 
 def lazy_apply( function, arguments):
   """similar to apply but returns a callable (lambda) that performs the apply when called."""
-  return lambda: apply( function, arguments)
+  return lambda: function( *arguments)
 
 
 
@@ -177,11 +177,11 @@ def reverse( iterable):
 
 # some helper, higher order functions
 
-map_functions = lambda funcs, value: zip( apply, funcs, len(funcs)*[value])
+map_functions = lambda funcs, value: list(map( lambda f: f(value), funcs))
 
-something_true = lambda vals: len( filter( None, vals))
+something_true = lambda vals: len( list(filter( None, vals)))
 
-some_apply = lambda func, vals: something_true( map( func, vals))
+some_apply = lambda func, vals: something_true( list(map( func, vals)))
 
 
 

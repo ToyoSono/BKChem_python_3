@@ -99,6 +99,10 @@ class molfile_exporter( plugin.exporter):
 def invert_coords( molecule, tr=None):
   if not tr:
     ys = [a.y for a in molecule.vertices]
+    if not ys:
+      # a file the reader could not parse at all yields an empty
+      # molecule - there is nothing to flip (max() used to raise here)
+      return None
     center_y = (max( ys) + min( ys)) / 2.0
     tr = transform.transform()
     tr.set_move( 0, -center_y)

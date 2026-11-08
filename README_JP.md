@@ -34,10 +34,15 @@ Windows ユーザーは Python をインストールする必要はありませ�
 - **壊れていた機能の修復**: ODF / OpenOffice Draw エクスポート、Align → Center（水平・垂直）、Chemistry → Check chemistry（以前は無言で常に「OK」でした）、＋記号の削除、Fragment overview のハイライト、マウスホイールズーム、3D 回転後の結合装飾の残像、など。
 - **ファイルダイアログが前回のフォルダを記憶**: 開く / 保存 / インポート / エクスポートのダイアログが、毎回 `C:\Windows\System32` からではなく前回使ったフォルダで開くようになりました。
 - **ポータブル版ビルド対応**: `run_bkchem.py` と `bkchem.spec` を同梱し、PyInstaller でポータブルな Windows 実行ファイルを作れるようにしました（手順は下記）。
+- **Generate InChI が使えるようになりました**: Chemistry → Generate InChI で、選択した構造式の InChI と InChIKey（立体化学を含む）を生成できます。公式 InChI プログラムを使うため、初回のみ設定が必要です（下記の「Generate InChI について」参照）。
 
 詳細は `CHANGELOG_JP.md` を見てください。（English: `CHANGELOG.md`）
 
 なお、元リポジトリ側の近代化作業については [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3) の履歴を見てください。
+
+## Generate InChI について
+
+Chemistry → Generate InChI は公式の InChI プログラムを外部実行する機能で、BKChem 本体には同梱されていません。[IUPAC-InChI の GitHub リリース](https://github.com/IUPAC-InChI/InChI/releases/latest)から InChI ソフトウェア（v1.07 以降、MIT ライセンス）をダウンロードしてください。`release_artifacts.zip` の中に `inchi-1.exe`（Windows)、`inchi-1`（Linux)、`inchi-1`（macOS）が入っています。自分の OS 用のプログラムを取り出し、BKChem の Options → InChI program path でそのファイルを指定すれば、構造式を選択したときに Generate InChI が使えるようになります。
 
 ## 動作要件
 

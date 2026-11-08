@@ -34,10 +34,15 @@ Highlights of the fixes and changes made after forking:
 - **Broken features repaired**: ODF / OpenOffice Draw export, Align → Center horizontally/vertically, Chemistry → Check chemistry (it silently always reported "OK" before), deletion of plus signs, Fragment overview highlights, mouse-wheel zoom, and leftover bond decorations after 3D rotation.
 - **File dialogs remember the last folder**: Open / Save / Import / Export dialogs reopen in the folder you used last time instead of always starting in `C:\Windows\System32`.
 - **Portable build support**: `run_bkchem.py` and `bkchem.spec` are included so a portable Windows executable can be built with PyInstaller (see below).
+- **Generate InChI works again**: Chemistry → Generate InChI produces the InChI and InChIKey for the selected structure (including stereochemistry), using the official InChI program — see [Generate InChI](#generate-inchi) below for the one-time setup.
 
 For details, see `CHANGELOG.md`. (日本語版は `CHANGELOG_JP.md`)
 
 The upstream version's own modernization work is described in the git history of [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3).
+
+## Generate InChI
+
+Chemistry → Generate InChI uses the official InChI program, which is not bundled with BKChem. Download the InChI software (v1.07 or later, MIT license) from the [IUPAC-InChI GitHub releases](https://github.com/IUPAC-InChI/InChI/releases/latest): the `release_artifacts.zip` contains `inchi-1.exe` (Windows), `inchi-1` (Linux) and `inchi-1` (macOS). Extract the program for your OS, then in BKChem choose Options → InChI program path and select it. After that, Generate InChI becomes available whenever a structure is selected.
 
 ## Requirements
 

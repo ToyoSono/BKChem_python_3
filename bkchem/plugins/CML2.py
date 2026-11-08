@@ -69,8 +69,9 @@ local_name = _("CML2")
 
 class CML2_atom( CML.CML_atom):
 
-  def __init__( self, atom=None, cml=None, scaling=1.0):
+  def __init__( self, atom=None, cml=None, scaling=1.0, y_flip_center=None):
     self._scaling = scaling
+    self._y_flip_center = y_flip_center
     self.id = None
     self.symbol = None
     self.x = None
@@ -175,6 +176,15 @@ class CML2_bond( CML.CML_bond):
         self.stereo = text.lower()
       else:
         self.stereo = 'n'
+    # Ketcher (and other CML2 writers) carry wedge/hash in a
+    # <bondStereo> element instead of <stereo>; without this the
+    # 10 wedge/hash bonds of e.g. ketcher.cml are silently dropped.
+    # C/T (cis/trans doubles) pass through as 'n' via transform_CML_bond.
+    for bs in cml.getElementsByTagName( 'bondStereo'):
+      text = dom_ext.getTextFromElement( bs).strip()
+      if text:
+        self.stereo = text.upper()
+        break
 
 class cml_exception( Exception):
   def __init__( self, value):

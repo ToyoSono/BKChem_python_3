@@ -58,12 +58,33 @@ class CML_importer( plugin.importer):
       out_m = self.transform_molecule( m, out)
       if out_m:
         root.appendChild( out_m)
+    # CML 2D coordinates (x2/y2) use y increasing upwards, like MDL
+    # molfiles, while the BKChem canvas uses y increasing downwards.
+    # Flip y around each molecule's centre so the drawing matches the
+    # source program (and the molfile import of the same file) instead
+    # of arriving as a vertical mirror image. The viewport below is
+    # unaffected: flipping swaps min/max y but keeps centre and range.
+    self._flip_y_in_cdml( root)
     view = self.on_end_set_viewport()
     if view:
       viewport = out.createElement( 'viewport')
       viewport.setAttribute( 'viewport', '%f %f %f %f' % view)
       root.insertBefore( viewport, root.firstChild)
     return root
+
+  def _flip_y_in_cdml( self, root):
+    """Mirror the y coordinate of every imported point around its own
+    molecule's centre (see get_cdml_dom). A single atom or a molecule
+    with a single y value is left unchanged."""
+    for mol in root.getElementsByTagName( 'molecule'):
+      pts = [p for p in mol.getElementsByTagName( 'point')
+             if p.getAttribute( 'y')]
+      if not pts:
+        continue
+      ys = [float( p.getAttribute( 'y')) for p in pts]
+      cy = (max( ys) + min( ys)) / 2.0
+      for p in pts:
+        p.setAttribute( 'y', str( 2*cy - float( p.getAttribute( 'y'))))
 
   def transform_molecule( self, mol, doc):
     #atoms
@@ -122,7 +143,12 @@ class CML_importer( plugin.importer):
       # bond does not have sufficient data to be safely converted to cdml
       raise plugin.import_exception( "missing "+str( bond.not_enough_data())+" in bond specification")
     out = doc.createElement( 'bond')
-    type = (bond.stereo.lower() or 'n') + str( bond.order)
+    stereo = bond.stereo.lower()
+    if stereo not in ('w', 'h'):
+      # CML also marks cis/trans double bonds (C/T); BKChem has no such
+      # bond type - the coordinates already carry that geometry
+      stereo = 'n'
+    type = stereo + str( bond.order)
     dom_ext.setAttributes( out,  (('type', type),
                                   ('start', bond.atom1),
                                   ('end', bond.atom2)))
@@ -232,8 +258,14 @@ class CML_exporter( plugin.exporter):
       if m.id:
         mol.setAttribute( 'id', m.id)
       atoms = dom_ext.elementUnder( mol, 'atomArray')
+      # Export mirrors the import flip (see CML_atom.read_atom): CML
+      # y2 is y-up, the canvas is y-down, so flip y around the
+      # molecule's centre or other programs show a vertical mirror.
+      ys = [a.y for a in m.atoms]
+      y_center = (max( ys) + min( ys)) / 2.0 if ys else None
       for a in m.atoms:
-        atoms.appendChild( self.CML_atom( atom=a, scaling=self.scale).get_CML_dom( out))
+        atoms.appendChild( self.CML_atom( atom=a, scaling=self.scale,
+                                          y_flip_center=y_center).get_CML_dom( out))
       bonds = dom_ext.elementUnder( mol, 'bondArray')
       for b in m.bonds:
         bonds.appendChild( self.CML_bond( bond=b).get_CML_dom( out))
@@ -272,8 +304,11 @@ local_name = _("CML")
 
 class CML_atom:
 
-  def __init__( self, atom=None, cml=None, scaling=1.0):
+  def __init__( self, atom=None, cml=None, scaling=1.0, y_flip_center=None):
     self._scaling = scaling
+    # Canvas y (down) of the molecule's centre, or None for no flip.
+    # Set by the exporter only; the importer flips in the CDML DOM.
+    self._y_flip_center = y_flip_center
     self.id = None
     self.symbol = None
     self.x = None
@@ -310,14 +345,19 @@ class CML_atom:
       return 0
     else:
       res = []
-      for i in ['id','name','x','y']:
-        if not self.__dict__[i]:
+      for i in ['id','symbol','x','y']:
+        v = self.__dict__.get( i)
+        if v is None or v == '':
           res.append( i)
       return res
 
   def read_atom( self, atom):
     self.x = atom.x * self._scaling
-    self.y = atom.y * self._scaling
+    if self._y_flip_center is None:
+      self.y = atom.y * self._scaling
+    else:
+      # CML y2 is y-up, the canvas is y-down (see write_to_file)
+      self.y = (2*self._y_flip_center - atom.y) * self._scaling
     self.id = atom.id
     self.symbol = atom.symbol
     self.charge = atom.charge
@@ -326,6 +366,15 @@ class CML_atom:
     # id could be attribute
     if cml.getAttribute( 'id'):
       self.id = cml.getAttribute( 'id')
+    # CML2 writers (Ketcher, ChemDraw, ...) carry the values in attributes
+    # of the atom element itself, not in builtin child elements
+    if cml.getAttribute( 'elementType'):
+      self.symbol = cml.getAttribute( 'elementType')
+    for attr, target in (('x2','x'), ('x3','x'), ('y2','y'), ('y3','y'), ('z3','z')):
+      if cml.getAttribute( attr):
+        setattr( self, target, float( cml.getAttribute( attr)))
+    if cml.getAttribute( 'formalCharge'):
+      self.charge = int( cml.getAttribute( 'formalCharge'))
     for e in cml.childNodes:
       if e.nodeValue:
         continue
@@ -398,8 +447,26 @@ class CML_bond:
     self.order = bond.order
 
   def read_CML( self, cml):
+    # CML2 writers carry the atom references and the order in attributes
+    refs = cml.getAttribute( 'atomRefs2').split()
+    if len( refs) >= 2:
+      self.atom1, self.atom2 = refs[0], refs[1]
+    if cml.getAttribute( 'order'):
+      order = cml.getAttribute( 'order')
+      if order == 'A':
+        self.order = 1
+      else:
+        try:
+          self.order = int( order)
+        except ValueError:
+          raise cml_exception( "Wrong bond order '%s'" % order)
     for e in cml.childNodes:
       if e.nodeValue:
+        continue
+      if e.nodeName == 'bondStereo':
+        stereo = dom_ext.getTextFromElement( e).strip()
+        if stereo:
+          self.stereo = stereo.upper()
         continue
       attr = e.getAttribute( 'builtin')
       if attr == 'atomRef':

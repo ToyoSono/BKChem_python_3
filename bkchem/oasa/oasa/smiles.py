@@ -592,7 +592,7 @@ class smiles( plugin):
     if not mol.is_connected():
       print("unconnected ", mol)
     if start_from and start_from.get_degree() > 1:
-      e = start_from._neighbors.keys()[0]
+      e = list( start_from._neighbors.keys())[0]
       mol.disconnect_edge( e)
       ps = [i for i in mol.get_connected_components()]
       if len( ps) == 1:
@@ -656,7 +656,7 @@ def is_line( mol):
   return False
 
 def is_pure_ring( mol):
-  return filter( lambda x: x.get_degree() != 2, mol.vertices) == []
+  return list( filter( lambda x: x.get_degree() != 2, mol.vertices)) == []
 
 def match_atom_lists( l1, l2):
   """sort of bubble sort with counter"""

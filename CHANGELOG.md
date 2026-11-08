@@ -4,6 +4,22 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 7 — 2026-11-08
+
+### Added / Changed
+
+- **Chemistry → Generate InChI works again**: it always relied on the official InChI program, but on Python 3 it failed even with the program installed (the subprocess call passed text where bytes are required), and InChI 1.07 no longer accepts the legacy STDIO option dialect — the program is now called through temporary files, and a wrong program path shows the dedicated error dialog instead of "Unknown error". Setup: download the InChI software (v1.07 or later, MIT license) from the IUPAC-InChI GitHub releases and point Options → InChI program path at `inchi-1.exe` / `inchi-1` for your OS (see "Generate InChI" in the README). Verified against InChI 1.07.5 with ethanol, acetate, L-alanine (including its stereochemistry) and troxerutin. (`bkchem/oasa/oasa/inchi.py`)
+- **CML import orientation now matches the other formats**: a CML file was drawn vertically mirrored compared with the same structure imported as MOL, and CML files BKChem exported opened mirrored in other editors. Import and export now flip the y coordinates symmetrically, and the CML2 importer reads Ketcher's `<bondStereo>` elements instead of silently dropping all wedge/hash bonds. Note: CML files exported by BKChem before this fix will now import mirrored. (`bkchem/plugins/CML.py`, `bkchem/plugins/CML2.py`)
+
+### Fixed
+
+- **Ketcher's MDL MOL V3000 files could not be imported**: oasa's molfile reader only understood V2000 and read a V3000 file as an empty molecule, which then crashed the import plugin. A V3000 reader (atom/bond blocks, charges, bond stereo) was added, and a file the reader cannot parse at all now gets the normal import error instead of a crash. (`bkchem/oasa/oasa/molfile.py`, `bkchem/plugins/molfile.py`)
+- **CDXML export lost all bonds and element identity in other programs**: exported bonds carried no `id` attribute (ChemSketch silently drops id-less objects, so only isolated atoms appeared) and heteroatoms had no `Element` attribute, so other programs read every atom as carbon. The exporter now writes document-wide ids, `Element` / `NodeType`, explicit bond orders and charges; the importer also honours the `Element` attribute, so a flipped "HO" hydroxyl label no longer round-trips as holmium. (`bkchem/plugins/CDXML.py`)
+- **Ketcher CML import crashed with `KeyError: 'name'`**: the importer only read old CML1-style child elements while Ketcher writes CML2 attributes; the graceful error path itself referenced a nonexistent field; and CML cis/trans bond stereo became unknown bond types that crashed drawing. All three are fixed, and wedge/hash stereo is preserved. (`bkchem/plugins/CML.py`)
+- **oasa's CIP priority code was dead on Python 3** (built-in `cmp` and other removed idioms): the priority machinery works again — e.g. FC(Cl)(Br)I is recognised as chiral with priorities I > Br > Cl > F. No BKChem feature calls it yet; fixed as part of the Python 3 sweep. (`bkchem/oasa/oasa/atom.py`)
+- **Ring SMILES writing**: oasa's `is_pure_ring()` compared a `filter()` object with a list, so on Python 3 it always answered "not a pure ring". (`bkchem/oasa/oasa/smiles.py`)
+- **Two silent Python 3 leftovers**: a type check in the external-data module always passed (`filter()` objects are always truthy), so invalid values were accepted silently; and three dead helper functions in oasa's misc module raised NameError / TypeError if ever called. (`bkchem/external_data.py`, `bkchem/oasa/oasa/misc.py`)
+
 ## Fork release 6 — 2026-11-07
 
 ### Fixed

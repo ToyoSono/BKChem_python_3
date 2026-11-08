@@ -49,7 +49,10 @@ class molfile( plugin):
     atoms = read_molfile_value( file, 3, conversion=int)
     bonds = read_molfile_value( file, 3, conversion=int)
     # nothing more interesting
-    file.readline()
+    counts_rest = file.readline()
+    if "V3000" in counts_rest:
+      self._read_body_v3000( file)
+      return
     # read the structure
     self.structure = molecule()
     for i in range( atoms):
@@ -64,6 +67,65 @@ class molfile( plugin):
       if line.strip().startswith( "M  "):
         self._read_property( line.strip())
       #print line.strip()
+
+  def _read_body_v3000( self, file):
+    # V3000 (written by Ketcher/Indigo, ChemDraw and others) replaces the
+    # fixed-width V2000 atom/bond blocks with "M  V30" key/value blocks
+    self.structure = molecule()
+    atoms = []         # oasa atoms in file order
+    index_to_pos = {}  # atom index used in the file -> position in atoms
+    block = None
+    pending = ""
+    for raw_line in file:
+      line = raw_line.strip()
+      if line == "M  END":
+        break
+      if not line.startswith( "M  V30"):
+        continue
+      data = line[6:].strip()
+      if pending:
+        data = pending + data
+        pending = ""
+      if data.endswith( "-"):
+        pending = data[:-1]  # V3000 continuation line
+        continue
+      words = data.split()
+      if not words:
+        continue
+      if words[0] == "BEGIN":
+        block = words[1] if len( words) > 1 else None
+        continue
+      if words[0] == "END":
+        block = None
+        continue
+      if block == "ATOM":
+        # index symbol x y z aamap [key=value ...]
+        a = self.structure.create_vertex()
+        a.symbol = words[1]
+        a.coords = (float( words[2]), float( words[3]), float( words[4]))
+        for kv in words[6:]:
+          if kv.startswith( "CHG="):
+            a.charge = int( kv[4:])
+        index_to_pos[ int( words[0])] = len( atoms)
+        atoms.append( a)
+        self.structure.add_vertex( v=a)
+      elif block == "BOND":
+        # index order atom1 atom2 [key=value ...]
+        order = int( words[1])
+        cfg = 0
+        for kv in words[4:]:
+          if kv.startswith( "CFG="):
+            cfg = int( kv[4:])
+        type = {0: 'n', 1: 'w', 6: 'h', 4: 'a'}.get( cfg, 'n')
+        if cfg == 3:
+          # Indigo/Ketcher write hashed single bonds as CFG=3; in the
+          # spec, CFG=3 on a double bond means cis/trans-unspecified
+          type = 'h' if order == 1 else 'n'
+        b = self.structure.create_edge()
+        b.order = order
+        b.type = type
+        self.structure.add_edge( index_to_pos[ int( words[2])],
+                                 index_to_pos[ int( words[3])], e=b)
 
   def _read_atom( self, file):
     x = read_molfile_value( file, 10, conversion=float)

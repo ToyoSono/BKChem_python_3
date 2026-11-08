@@ -783,8 +783,47 @@ import subprocess
 
 def _run_command( command, input):
   p = subprocess.Popen( command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-  o, er = p.communicate( str( input))
-  return o
+  o, er = p.communicate( input.encode( "utf-8"))
+  return o.decode( "utf-8", "replace")
+
+
+def _run_inchi_program( program, mf, fixed_hs):
+  """Run the InChI program on MOL text (mf) via temporary files and return
+  (output_text, log_text). File mode is used because InChI 1.07 no longer
+  accepts the legacy STDIO option dialect this module was written against."""
+  import tempfile
+  if os.name == 'nt':
+    options = ["/AUXNONE", "/Key"] + (["/FixedH"] if fixed_hs else [])
+  else:
+    options = ["-AUXNONE", "-Key"] + (["-FixedH"] if fixed_hs else [])
+  paths = []
+  try:
+    for suffix in (".mol", ".txt", ".log"):
+      fd, path = tempfile.mkstemp( suffix=suffix)
+      os.close( fd)
+      paths.append( path)
+    with open( paths[0], "w", encoding="utf-8") as f:
+      f.write( mf)
+    command = [os.path.abspath( program)] + paths + options
+    try:
+      subprocess.run( command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError as e:
+      raise oasa_inchi_error( "Could not run the InChI program '%s': %s" % (program, e))
+    output = ""
+    if os.path.exists( paths[1]):
+      with open( paths[1], encoding="utf-8", errors="replace") as f:
+        output = f.read()
+    log = ""
+    if os.path.exists( paths[2]):
+      with open( paths[2], encoding="utf-8", errors="replace") as f:
+        log = f.read()
+    return output, log
+  finally:
+    for path in paths:
+      try:
+        os.remove( path)
+      except OSError:
+        pass
 
 
 def generate_inchi_and_inchikey( m, program=None, fixed_hs=True, ignore_key_error=False):
@@ -794,13 +833,7 @@ def generate_inchi_and_inchikey( m, program=None, fixed_hs=True, ignore_key_erro
     from . import config
     program = config.Config.inchi_binary_path
   mf = molfile.mol_to_text( m)
-  if os.name == 'nt':
-    options = "/AUXNONE /STDIO /Key" + (fixed_hs and " /FixedH" or "")
-  else:
-    options = "-AUXNONE -STDIO -Key" + (fixed_hs and " -FixedH" or "")
-  #print options
-  command = [os.path.abspath( program)] + options.split()
-  text = _run_command( command, mf)
+  text, log_text = _run_inchi_program( program, mf, fixed_hs)
   inchi = ""
   key = ""
   warnings = []
@@ -816,6 +849,12 @@ def generate_inchi_and_inchikey( m, program=None, fixed_hs=True, ignore_key_erro
       inchi = inchi + line.strip()
     elif line.startswith( "Error"):
       break
+  # in file mode the program writes its warnings to the log file instead
+  for line in log_text.splitlines():
+    if "Warning" in line:
+      warning = line.strip() + "\n"
+      if warning not in warnings:
+        warnings.append( warning)
   if not inchi:
     raise oasa_inchi_error( "InChI program did not create any output InChI")
   if not key:

@@ -28,6 +28,9 @@
 from . import plugin
 import xml.dom.minidom as dom
 from .. import dom_extensions as dom_ext
+from ..oasa import periodic_table as PT
+
+_cdxml_ord_to_symbol = dict( (v['ord'], k) for k, v in PT.periodic_table.items())
 import math
 from ..molecule import molecule
 from ..classes import plus, point, text as text_class
@@ -74,6 +77,7 @@ class CDXML_importer( plugin.importer):
         mol = molecule( paper=self.paper) 
         atom_id_to_atom = {}
         atom_id_to_text = {}
+        atom_id_to_element = {}
         for elem2 in elem1.childNodes:
           
           # atom
@@ -109,6 +113,13 @@ class CDXML_importer( plugin.importer):
             
             # we must postpone symbol assignment until we know the valency of the atoms
             atom_id_to_text[ elem2.getAttribute('id')] = text
+            if elem2.hasAttribute("Element"):
+              try:
+                symbol = _cdxml_ord_to_symbol.get( int( elem2.getAttribute("Element")))
+              except ValueError:
+                symbol = None
+              if symbol:
+                atom_id_to_element[ elem2.getAttribute('id')] = symbol
             atom = mol.create_vertex()
             atom.line_color = color1
             atom.font_family = font
@@ -151,6 +162,19 @@ class CDXML_importer( plugin.importer):
         # here we reassign the symbols
         for id,atom in atom_id_to_atom.items():
           text = atom_id_to_text[ id]
+          if id in atom_id_to_element:
+            # The Element attribute states what the atom is; the label
+            # only adds hydrogens and a charge. A label written from the
+            # other side ("HO" for a hydroxyl oxygen) would otherwise be
+            # parsed as the element holmium, so rebuild the label from
+            # the stated element when it is only element + hydrogens.
+            symbol = atom_id_to_element[ id]
+            body, charge = text, ""
+            m = re.match( r"^(.*?)(\d*[+-])$", text)
+            if m:
+              body, charge = m.group(1), m.group(2)
+            if body.replace( "H", "") == symbol:
+              text = symbol + "H" * body.count( "H") + charge
           v = mol.create_vertex_according_to_text( atom, text)
           atom.copy_settings( v)
           mol.replace_vertices( atom, v)
@@ -277,6 +301,19 @@ class CDXML_exporter( plugin.exporter):
 
     fonts=["Arial","Times New Roman"]
 
+    # Every object in a CDXML document is supposed to carry a unique id.
+    # Other readers (ChemSketch, ChemDraw) silently drop objects that
+    # have none - this exporter used to write bonds, pages and fragments
+    # without an id, so a file exported here lost all its bonds when it
+    # was opened in ChemSketch. Number everything from a single counter
+    # instead of reusing the paper object ids, which are only unique
+    # within one object type.
+    _id_counter = [1000]  # the font table below numbers its fonts from 3
+    def _new_id():
+      _id_counter[0] += 1
+      return str( _id_counter[0])
+    atom_ids = {}
+
     out=dom.Document()
     root=out.createElement("CDXML")
     out.appendChild(root)
@@ -291,6 +328,7 @@ class CDXML_exporter( plugin.exporter):
     root.appendChild(elem1) 
     PaperX=int(Screen.mm_to_px( self.paper.get_paper_property("size_x") ) )
     PaperY=int(Screen.mm_to_px( self.paper.get_paper_property("size_y") ) )
+    elem1.setAttribute("id",_new_id())
     elem1.setAttribute("BoundingBox","%d %d %d %d" % (0,0,PaperX,PaperY) )
     elem1.setAttribute("Width",str(PaperX) )
     elem1.setAttribute("Height",str(PaperY) )
@@ -299,17 +337,30 @@ class CDXML_exporter( plugin.exporter):
     for mol in self.paper.molecules:
       elem2=out.createElement("fragment")
       elem1.appendChild(elem2)
+      elem2.setAttribute("id",_new_id())
   
       for atom in mol.atoms:
         elem3=out.createElement("n")
         elem2.appendChild(elem3)
-        elem3.setAttribute("id",re.sub("atom","",atom.id) ) 
+        atom_ids[ atom] = _new_id()
+        elem3.setAttribute("id", atom_ids[ atom] )
         elem3.setAttribute("p","%f %f" %(atom.x,atom.y) )
         elem3.setAttribute("NumHydrogens","%d" % atom.free_valency)
+        if atom.symbol in PT.periodic_table:
+          # a node without an Element attribute is read as carbon by
+          # other programs, whatever label text it carries - heteroatoms
+          # must state their element explicitly, as ChemDraw does
+          elem3.setAttribute("NodeType","Element")
+          elem3.setAttribute("Element","%d" % PT.periodic_table[ atom.symbol]['ord'])
+        elif atom.symbol != "C" or atom.show:
+          elem3.setAttribute("NodeType","Nickname")
+        if atom.charge:
+          elem3.setAttribute("Charge","%d" % atom.charge)
     
         if atom.symbol != "C" or atom.show:
           elem4=out.createElement("t")
           elem3.appendChild(elem4)
+          elem4.setAttribute("id",_new_id())
           elem6=out.createElement("s")
           elem6.setAttribute("size",str(atom.font_size) )
           elem6.setAttribute("face","96")
@@ -341,8 +392,9 @@ class CDXML_exporter( plugin.exporter):
       for bond in mol.bonds:
         elem5=out.createElement("b")
         elem2.appendChild(elem5)
-        elem5.setAttribute("B",re.sub("atom","",bond.atom1.id) ) 
-        elem5.setAttribute("E",re.sub("atom","",bond.atom2.id) )
+        elem5.setAttribute("id",_new_id())
+        elem5.setAttribute("B",atom_ids[ bond.atom1] )
+        elem5.setAttribute("E",atom_ids[ bond.atom2] )
         for bondB,bondC in bondType.items():
           if bond.type==bondB:
             elem5.setAttribute("Display",bondC)
@@ -358,14 +410,13 @@ class CDXML_exporter( plugin.exporter):
         elem5.setAttribute("color",ShowColor)
     
         #print int( self.paper.any_color_to_rgb_string( bond.line_color)[1:3], 16)
-        if bond.order > 1:
-          elem5.setAttribute("Order","%d" % bond.order )
+        elem5.setAttribute("Order","%d" % bond.order )
         #print bond.type,bond.equithick,bond.simple_double
     
     for text in self.paper.texts:
       elem7=out.createElement("t")
       elem1.appendChild(elem7)
-      elem7.setAttribute("id",re.sub("text","",text.id))
+      elem7.setAttribute("id",_new_id())
       elem7.setAttribute("p","%f %f" % (text.x,text.y))
       elem7.setAttribute("BoundingBox","%d %d %d %d" % (text.bbox()[0],text.bbox()[1],text.bbox()[2],text.bbox()[3]) )
       
@@ -440,7 +491,7 @@ class CDXML_exporter( plugin.exporter):
       elem9.setAttribute("SymbolType","Plus")
       elem9.setAttribute("BoundingBox","%f %f %f %f" % plus.bbox())
       elem9.setAttribute("GraphicType","Symbol")
-      elem9.setAttribute("id",re.sub("plus","",plus.id))
+      elem9.setAttribute("id",_new_id())
       #print plus.bbox()
       NewColor=self.paper.any_color_to_rgb_string(plus.line_color)
       if NewColor not in colors:
@@ -455,6 +506,7 @@ class CDXML_exporter( plugin.exporter):
   
       elem10=out.createElement("graphic")
       elem1.appendChild(elem10)
+      elem10.setAttribute("id",_new_id())
       elem10.setAttribute("GraphicType","Line")
       for arrowB,arrowC in arrowType.items():
           if arrow.type==arrowB:
@@ -469,6 +521,7 @@ class CDXML_exporter( plugin.exporter):
 
       elem11=out.createElement("arrow")
       elem1.appendChild(elem11)
+      elem11.setAttribute("id",_new_id())
       for arrowB,arrowC in arrowType.items():
           if arrow.type==arrowB:
             elem11.setAttribute("ArrowheadHead",arrowC[1]) 
