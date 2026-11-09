@@ -294,6 +294,8 @@ class BKChem( Tk):
       ( _("Options"), 'command', _('Logging'), None, _("Set how messages in BKChem are displayed to you"), lambda : interactors.set_logging( self.paper, Store.logger), None),
       ( _("Options"), 'command', _('InChI program path'), None, _("To use InChI in BKChem you must first give it a path to the InChI program here"),
         interactors.ask_inchi_program_path, None),
+      ( _("Options"), 'command', _('OpenBabel program path'), None, _("If set, SMILES and InChI are read with the OpenBabel program (obabel)"),
+        interactors.ask_openbabel_program_path, None),
       ( _("Options"), 'separator'),      
       ( _("Options"), 'command', _('Preferences'), None, _("Preferences"), self.ask_preferences, None),
 
@@ -1261,7 +1263,7 @@ Enter SMILES:""")
 
     if text:
       #      try:
-      mol = oasa_bridge.read_smiles( text, self.paper)
+      mol = oasa_bridge.read_smiles( text, self.paper, openbabel_program=Store.pm.get_preference( "openbabel_program_path"))
 ##       except :
 ##      if not smiles:
 ##        tkMessageBox.showerror( _("Error processing %s") % 'SMILES',
@@ -1299,10 +1301,10 @@ Enter InChI:""")
     if text:
       if config.devel:
         # in development mode we do not want to catch the exceptions
-        mol = oasa_bridge.read_inchi( text, self.paper)
+        mol = oasa_bridge.read_inchi( text, self.paper, openbabel_program=Store.pm.get_preference( "openbabel_program_path"))
       else:
         try:
-          mol = oasa_bridge.read_inchi( text, self.paper)
+          mol = oasa_bridge.read_inchi( text, self.paper, openbabel_program=Store.pm.get_preference( "openbabel_program_path"))
         except oasa.oasa_exceptions.oasa_not_implemented_error as e:
           if not inchi:
             tkMessageBox.showerror( _("Error processing %s") % 'InChI',

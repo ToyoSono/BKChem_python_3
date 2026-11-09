@@ -4,6 +4,17 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 8 — 2026-11-09
+
+### Added / Changed
+
+- **Chemistry → Read SMILES and Read InChI can now use OpenBabel**: a new Options → OpenBabel program path setting points BKChem at `obabel.exe` / `obabel`; when set, both readers are handled by OpenBabel (parsing plus 2D coordinates via `--gen2d`, imported as MOL), which generally draws more regular layouts — Toyohide's decision after comparing Phloxine B, where OpenBabel's bond lengths and angles were visibly more uniform. If the program is missing or cannot read an input, BKChem silently falls back to its own oasa reader, and leaving the path empty restores the previous behaviour exactly. One subtlety found in verification: OpenBabel's coordinates are y-up while BKChem's canvas is y-down, so the import flips y — without it every stereocentre inverted (9/48 on the stereo battery; 48/48 with the flip). Bonus on the OpenBabel path: multi-component (salt) InChI now loads (Brilliant Blue FCF, 53 atoms) and InChI stereo (/t) layers are drawn. Verified on Windows with OpenBabel 3.1.1 from the GitHub installer — the `pip install openbabel` package has no Python 3.15 wheel, so the installer, not pip, is the way to get `obabel.exe` (see "OpenBabel for reading SMILES and InChI" in the README). (`bkchem/oasa_bridge.py`, `bkchem/main.py`, `bkchem/interactors.py`)
+
+### Fixed
+
+- **Crowded molecules sometimes loaded badly distorted from SMILES**: the layout score only measured atom–atom distances, so a layout with an arm draped over the middle could score well while looking collapsed, and with only 6 candidates a good layout often was not even tried (Brilliant Blue FCF came out badly distorted in 3 of 12 loads). The score now also counts crowded pairs, atom-to-bond distances and atoms lying on bonds, and the candidate count rose from 6 to 12 (SMILES) and 3 to 8 (InChI). After the fix, 12 fresh loads of Brilliant Blue FCF were all clean; the five J-GLOBAL compounds and the 48/48 stereo battery are unchanged. The single cleanest orientation is still not guaranteed every time. (`bkchem/oasa_bridge.py`)
+- **Python 3 incompatibilities left in unused legacy APIs fixed**: a `raise StopIteration` inside a generator in `periodic_table.py`, the same pattern plus a lambda passed to `sort()` in `graph.py`, and a `map(...).sort()` in a superseded function in `molecule.py`. None of these are called by any current feature, so there is no behavioural change. (`bkchem/oasa/oasa/periodic_table.py`, `bkchem/oasa/oasa/graph/graph.py`, `bkchem/oasa/oasa/molecule.py`)
+
 ## Fork release 7 — 2026-11-08
 
 ### Added / Changed

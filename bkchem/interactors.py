@@ -174,6 +174,22 @@ def ask_inchi_program_path():
 
 
 
+def ask_openbabel_program_path():
+  path = Store.pm.get_preference( "openbabel_program_path") or ""
+  dial = widgets.FileSelectionWithText( Store.app,
+                                        title=_("The OpenBabel program path"),
+                                        prompt =_("Select the OpenBabel program executable (obabel): "),
+                                        value = path,
+                                        filetypes=((_("Executable files"), ("*",)),)
+                                        )
+  a = dial.activate()
+  if a == _("OK"):
+    Store.pm.add_preference( "openbabel_program_path", dial.entry.get())
+    return 1
+  return 0
+
+
+
 def ask_display_form_for_selected( paper):
   top_levels, unique = paper.selected_to_unique_top_levels()
   ms = [o for o in top_levels if isinstance( o, molecule)]

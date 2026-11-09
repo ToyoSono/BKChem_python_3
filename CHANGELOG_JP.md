@@ -4,6 +4,17 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 8 — 2026-11-09
+
+### 追加・変更（Added / Changed）
+
+- **Chemistry → Read SMILES / Read InChI で OpenBabel が使えるようになりました**: Options → OpenBabel program path で `obabel.exe` / `obabel` を指定すると、両方の読み込みを OpenBabel が担当します（解析と `--gen2d` による 2D 座標生成を行い、MOL 経由で取り込みます）。フロキシンBの比較で、OpenBabel の方が結合長・結合角が均一で見た目がきれいだったことが採用の決め手です。プログラムが存在しない場合や、OpenBabel が読めない入力では無言で従来の oasa 読み込みに戻り、欄を空にすれば完全に元の動作です。検証で見つけた落とし穴: OpenBabel の座標は y 軸が上向きで BKChem のキャンバスは下向きのため、そのまま取り込むとすべての立体中心が反転しました（立体バッテリー 9/48）。CML 取り込みと同じ上下反転を入れて 48/48 に直してあります。副次的な改善として、複数成分（塩）の InChI が読めるようになり（ブリリアントブルー FCF、53 原子)、InChI の立体（/t 層）も描画に反映されます。Windows では OpenBabel 3.1.1（GitHub のインストーラー）で確認済みです。`pip install openbabel` には Python 3.15 用ホイールがないため、インストーラー版を使ってください（README の「SMILES / InChI 読み込みと OpenBabel」参照）。（`bkchem/oasa_bridge.py`、`bkchem/main.py`、`bkchem/interactors.py`）
+
+### 修正（Fixed）
+
+- **混み合った分子が SMILES からときどき大きく歪んで読み込まれる**: 配置の評価が原子同士の距離しか見ていなかったため、腕が中央に覆いかぶさった崩れが見抜けず、候補も 6 個しか作っていなかったため良い配置がそもそも試されない回がありました（ブリリアントブルー FCF は 12 回中 3 回が大きく歪みました）。評価に密集 pair 数・原子と結合の距離・結合の上に乗った原子の数を追加し、候補数を SMILES 6→12、InChI 3→8 に増やしました。修正後はブリリアントブルー FCF の新規 12 回読み込みがすべて交差なしの整った配置になり、J-GLOBAL 5 化合物とステレオバッテリー 48/48 に悪化はありません。一番きれいな向きが毎回出る保証まではありません。（`bkchem/oasa_bridge.py`）
+- **呼び出し元のない旧 API に残っていた Python 3 非互換を修正**: `periodic_table.py` のジェネレータ内の `raise StopIteration`、`graph.py` の同じパターンと `sort()` へのラムダ渡し、`molecule.py` 旧関数の `map(...).sort()` を直しました。いずれも現在の機能からは呼ばれていないコードで、動作への影響はありません。（`bkchem/oasa/oasa/periodic_table.py`、`bkchem/oasa/oasa/graph/graph.py`、`bkchem/oasa/oasa/molecule.py`）
+
 ## フォーク リリース 7 — 2026-11-08
 
 ### 追加・変更（Added / Changed）

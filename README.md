@@ -6,9 +6,9 @@ This repository is **ToyoSono's fork** of [vijaymasand/BKChem_python_3](https://
 
 [日本語版 README はこちら](README_JP.md) / [日本語の変更履歴](CHANGELOG_JP.md)
 
-## Download for Windows
+## Portable Version for Windows
 
-Windows users do **not** need to install Python. Download **`BKChem-portable.zip`** from the [Releases page](https://github.com/ToyoSono/BKChem_python_3/releases), unzip it anywhere, and run **`BKChem.exe`** inside the unzipped folder.
+A portable version that requires **no** Python installation is provided for Windows users. Download **`BKChem-portable.zip`** from the [Releases page](https://github.com/ToyoSono/BKChem_python_3/releases), unzip it anywhere, and run **`BKChem.exe`** inside the unzipped folder.
 
 - Keep `BKChem.exe` together with the `_internal` folder next to it — the program will not start without it.
 - The executable is not code-signed, so Windows SmartScreen may show a warning on first run. Click "More info" and then "Run anyway" to start it.
@@ -36,6 +36,8 @@ Highlights of the fixes and changes made after forking:
 - **Portable build support**: `run_bkchem.py` and `bkchem.spec` are included so a portable Windows executable can be built with PyInstaller (see below).
 - **Generate InChI works again**: Chemistry → Generate InChI produces the InChI and InChIKey for the selected structure (including stereochemistry), using the official InChI program — see [Generate InChI](#generate-inchi) below for the one-time setup.
 
+- **Read SMILES / Read InChI can use OpenBabel**: with Options → OpenBabel program path set to `obabel.exe` / `obabel`, both readers are handled by OpenBabel (parsing plus 2D coordinates), which generally draws more regular layouts. Without the setting, or if OpenBabel fails, BKChem falls back to its own reader — see [OpenBabel for reading SMILES and InChI](#openbabel-for-reading-smiles-and-inchi) below for the one-time setup.
+
 For details, see `CHANGELOG.md`. (日本語版は `CHANGELOG_JP.md`)
 
 The upstream version's own modernization work is described in the git history of [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3).
@@ -43,6 +45,17 @@ The upstream version's own modernization work is described in the git history of
 ## Generate InChI
 
 Chemistry → Generate InChI uses the official InChI program, which is not bundled with BKChem. Download the InChI software (v1.07 or later, MIT license) from the [IUPAC-InChI GitHub releases](https://github.com/IUPAC-InChI/InChI/releases/latest): the `release_artifacts.zip` contains `inchi-1.exe` (Windows), `inchi-1` (Linux) and `inchi-1` (macOS). Extract the program for your OS, then in BKChem choose Options → InChI program path and select it. After that, Generate InChI becomes available whenever a structure is selected.
+
+
+## OpenBabel for reading SMILES and InChI
+
+Chemistry → Read SMILES / Read InChI converts the entered string into a structure with BKChem's built-in reader. For structurally complex compounds, however, the resulting drawing can be strongly distorted, or the built-in reader may not be able to handle the input at all. If you run into trouble reading a compound from SMILES or InChI, linking BKChem with OpenBabel — a structure-file format converter — is recommended.
+
+First, install OpenBabel. On Windows, download OpenBabel 3.1.1 from the [OpenBabel GitHub releases](https://github.com/openbabel/openbabel/releases/tag/openbabel-3-1-1) (`OpenBabel-3.1.1-x64.exe`, 38.7 MB) and install it. On other operating systems, install OpenBabel by the method appropriate for that OS.
+
+Then, in BKChem, choose Options → OpenBabel program path and select the executable — on Windows, `C:\Program Files\OpenBabel-3.1.1\obabel.exe`. After that, SMILES / InChI are read through OpenBabel (parsing plus 2D coordinate generation via `--gen2d`). If the program is missing, the field is empty, or OpenBabel cannot read an input, BKChem silently falls back to its own reader.
+
+Note: `pip install openbabel` does not work on Python 3.15 (the package provides wheels only up to Python 3.14). Unless you specifically need the OpenBabel Python package, installing the standalone program is recommended.
 
 ## Requirements
 
@@ -68,12 +81,14 @@ To run BKChem from source (for the portable executable above, none of this is ne
    pip install Pmw Pillow pycairo pywin32
    ```
 
+   Note: `pywin32` is a Windows-only package — omit it on other operating systems.
+
 3. **Launch BKChem**:
    ```bash
    python start_bkchem.py
    ```
 
-## Building the Portable Windows Executable
+## Building the Portable Executable
 
 After steps 1–2 of Quick Start:
 
@@ -88,9 +103,11 @@ After steps 1–2 of Quick Start:
    ```bash
    python -m PyInstaller --noconfirm bkchem.spec
    ```
-   Note: `bkchem.spec` builds with a console window (`console=True`) so that startup errors stay visible while developing. For a release build, set `console=False` in `bkchem.spec` first.
+   Note: `bkchem.spec` is published on GitHub with `console=False` (no console window). If you need a console, change that line to `console=True` before building.
 
 7. The result is in the **`dist\BKChem`** folder: `BKChem.exe` together with an `_internal` folder. Both must stay together — to distribute it, zip the whole `dist\BKChem` folder (as `BKChem-portable.zip`) and attach the zip to a GitHub Release.
+
+   Note: the portable builds attached to GitHub Releases are for Windows. The same procedure has been verified to work on Linux, where the result is `dist/BKChem/BKChem` (an executable without an extension, next to the `_internal` folder). macOS is unverified.
 
 ## Support & Contribution
 

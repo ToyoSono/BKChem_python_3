@@ -6,9 +6,9 @@
 
 [English README](README.md) / [英語の変更履歴](CHANGELOG.md)
 
-## Windows 版のダウンロード
+## Windows 向けポータブル版のダウンロード
 
-Windows ユーザーは Python をインストールする必要はありません。[Releases ページ](https://github.com/ToyoSono/BKChem_python_3/releases)から **`BKChem-portable.zip`** をダウンロードし、任意の場所に展開して、中の **`BKChem.exe`** を実行してください。
+Windows ユーザーには Python のインストールが不要なポータブル版を用意しました。[Releases ページ](https://github.com/ToyoSono/BKChem_python_3/releases)から **`BKChem-portable.zip`** をダウンロードし、任意の場所に展開して、中の **`BKChem.exe`** を実行してください。
 
 - `BKChem.exe` は隣の `_internal` フォルダと一緒でないと起動しません。離さないでください。
 - 実行ファイルにはコード署名がないため、初回起動時に Windows SmartScreen の警告が出ることがあります。「詳細情報」→「実行」の順にクリックすると起動できます。
@@ -36,6 +36,8 @@ Windows ユーザーは Python をインストールする必要はありませ�
 - **ポータブル版ビルド対応**: `run_bkchem.py` と `bkchem.spec` を同梱し、PyInstaller でポータブルな Windows 実行ファイルを作れるようにしました（手順は下記）。
 - **Generate InChI が使えるようになりました**: Chemistry → Generate InChI で、選択した構造式の InChI と InChIKey（立体化学を含む）を生成できます。公式 InChI プログラムを使うため、初回のみ設定が必要です（下記の「Generate InChI について」参照）。
 
+- **SMILES / InChI の読み込みに OpenBabel が使えます**: Options → OpenBabel program path で `obabel.exe` / `obabel` を指定すると、両方の読み込みを OpenBabel が担当し、より整った配置で描かれます。未設定の場合や OpenBabel が失敗した場合は従来の読み込みに戻ります（下記の「SMILES / InChI 読み込みと OpenBabel」参照）。
+
 詳細は `CHANGELOG_JP.md` を見てください。（English: `CHANGELOG.md`）
 
 なお、元リポジトリ側の近代化作業については [vijaymasand/BKChem_python_3](https://github.com/vijaymasand/BKChem_python_3) の履歴を見てください。
@@ -43,6 +45,17 @@ Windows ユーザーは Python をインストールする必要はありませ�
 ## Generate InChI について
 
 Chemistry → Generate InChI は公式の InChI プログラムを外部実行する機能で、BKChem 本体には同梱されていません。[IUPAC-InChI の GitHub リリース](https://github.com/IUPAC-InChI/InChI/releases/latest)から InChI ソフトウェア（v1.07 以降、MIT ライセンス）をダウンロードしてください。`release_artifacts.zip` の中に `inchi-1.exe`（Windows)、`inchi-1`（Linux)、`inchi-1`（macOS）が入っています。自分の OS 用のプログラムを取り出し、BKChem の Options → InChI program path でそのファイルを指定すれば、構造式を選択したときに Generate InChI が使えるようになります。
+
+
+## SMILES / InChI 読み込みと OpenBabel
+
+Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 内部のプログラムで構造式に変換されます。しかし、構造が複雑な化合物の場合、得られる構造式の形状が大きく歪んだり、内部プログラムで処理しきれなくなります。自分が描きたい化合物を SMILES や InChI で読み込む際に不具合が生じるなら構造式ファイルの書式コンバーターである OpenBabel との連携をおすすめします。
+
+まず OpenBabel をインストールしてください。Windows の場合は [OpenBabel の GitHub リリース](https://github.com/openbabel/openbabel/releases/tag/openbabel-3-1-1)から Windows 版 OpenBabel 3.1.1（`OpenBabel-3.1.1-x64.exe`、38.7 MB）をダウンロードしてインストールしてください。その他の OS ではそれぞれの方法で OpenBabel をインストールしてください。
+
+次に BKChem の Options → OpenBabel program path で実行ファイルを指定してください。Windows の場合は `C:\Program Files\OpenBabel-3.1.1\obabel.exe` を選択することになります。この設定後は SMILES / InChI は OpenBabel 経由（解析＋ `--gen2d` による 2D 座標生成）で読み込まれます。プログラムが存在しない場合、欄が空の場合、OpenBabel が読めない入力では無言で従来の読み込みに戻ります。
+
+注意: `pip install openbabel` は Python 3.15 では使えません（ホイールは Python 3.14 までしかありません)。どうしても OpenBabel の Python パッケージが必要な方以外は単体でのインストールをおすすめします。
 
 ## 動作要件
 
@@ -67,13 +80,14 @@ Chemistry → Generate InChI は公式の InChI プログラムを外部実行�
    ```bash
    pip install Pmw Pillow pycairo pywin32
    ```
+   注: `pywin32` は Windows 用のパッケージです。Windows 以外の OS では外して実行してください。
 
 3. **BKChem を起動する**:
    ```bash
    python start_bkchem.py
    ```
 
-## ポータブル Windows 実行ファイルの作り方
+## ポータブル版「実行ファイル」の作り方
 
 クイックスタートの 1〜2 の後に続けます。
 
@@ -88,9 +102,11 @@ Chemistry → Generate InChI は公式の InChI プログラムを外部実行�
    ```bash
    python -m PyInstaller --noconfirm bkchem.spec
    ```
-   補足: `bkchem.spec` は開発中は起動エラーが見えるようコンソール付き（`console=True`）になっています。公開用ビルドでは、先に `bkchem.spec` の `console=False` に変えてください。
+   補足: `bkchem.spec` はコンソールなし（`console=False`）で github に置いてます。コンソールが必要な方は、先に `bkchem.spec` の該当行を `console=True` に変えて実行してください。
 
 7. 成果物は **`dist\BKChem`** フォルダにできます（`BKChem.exe` と `_internal` フォルダ）。この2つは常に一緒に扱ってください。配布する場合は `dist\BKChem` フォルダ全体を zip（`BKChem-portable.zip`）にして、GitHub の Release に添付します。
+
+   補足: GitHub の Releases で配布しているポータブル版は Windows 用です。同じ手順は Linux でも使えることを確認済みで、その場合の成果物は `dist/BKChem/BKChem`（拡張子なしの実行ファイルと `_internal` フォルダ）になります。macOS では未確認です。
 
 ## サポート・コントリビューション
 

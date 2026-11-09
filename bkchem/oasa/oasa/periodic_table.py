@@ -379,7 +379,7 @@ def gen_bit_masks( length):
       if ret[j] == 2:
         ret[j] = 0
         if j == length-1:
-          raise StopIteration
+          return
         else:
           ret[j+1] += 1
       else:

@@ -30,6 +30,9 @@ from . import atom
 
 import math
 import operator
+import os
+import subprocess
+import tempfile
 
 from .singleton_store import Screen
 from .oasa import transform3d
@@ -181,7 +184,9 @@ def _layout_metrics( pos, bonds, neighbours):
   closer than 0.6, number closer than 0.85, number of bond
   crossings, RMS bond-length deviation in %, mean absolute deviation
   of bond angles from 120 degrees, number of chain angles below
-  100 degrees)."""
+  100 degrees, number of non-bonded pairs closer than 1.15, min
+  atom-to-bond distance, number of atom-to-bond pairs closer
+  than 0.45)."""
   n = len( pos)
   bonded = set( bonds)
   for i, j in bonds:
@@ -194,6 +199,7 @@ def _layout_metrics( pos, bonds, neighbours):
   min_nb = 9e9
   severe = 0
   close = 0
+  crowd = 0
   for i in range( n):
     for j in range( i + 1, n):
       if (i, j) in bonded:
@@ -205,6 +211,8 @@ def _layout_metrics( pos, bonds, neighbours):
         severe += 1
       if d < 0.85:
         close += 1
+      if d < 1.15:
+        crowd += 1
   devs = []
   for i, j in bonds:
     l = math.hypot( pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]) / med
@@ -256,17 +264,49 @@ def _layout_metrics( pos, bonds, neighbours):
       s4 = side( pos[k][0], pos[k][1], pos[l][0], pos[l][1], pos[j][0], pos[j][1])
       if s3 != 0 and s4 != 0 and s3 != s4:
         crossings += 1
+  # atom-to-bond proximity: an atom lying on or near a bond it does
+  # not belong to is invisible to the atom-atom measures above, yet
+  # it is what makes a folded layout look tangled (a side chain laid
+  # across a ring, an ion placed inside a ring)
+  min_seg = 9e9
+  seg_close = 0
+  for k in range( n):
+    px, py = pos[k]
+    for (i, j) in bonds:
+      if k == i or k == j:
+        continue
+      ax, ay = pos[i]
+      bx, by = pos[j]
+      dx, dy = bx - ax, by - ay
+      l2 = dx * dx + dy * dy
+      if l2 < 1e-12:
+        d = math.hypot( px - ax, py - ay)
+      else:
+        t = ((px - ax) * dx + (py - ay) * dy) / l2
+        t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+        d = math.hypot( px - (ax + t * dx), py - (ay + t * dy))
+      d /= med
+      if d < min_seg:
+        min_seg = d
+      if d < 0.45:
+        seg_close += 1
+  if min_seg >= 9e9:
+    min_seg = 2.0
   return (min_nb, severe, close, crossings, bl_rms,
-          sum( ang_devs) / len( ang_devs) if ang_devs else 0.0, sharp)
+          sum( ang_devs) / len( ang_devs) if ang_devs else 0.0, sharp,
+          crowd, min_seg, seg_close)
 
 
 def _layout_score( met):
   """One weighted quality score for a layout (lower is better);
   used to keep the best state a layout pass has seen."""
-  min_nb, severe, close, crossings, bl_rms, ang_mad, sharp = met
+  (min_nb, severe, close, crossings, bl_rms, ang_mad, sharp,
+   crowd, min_seg, seg_close) = met
   return (500.0 * severe + 200.0 * max( 0.0, 0.8 - min_nb)
           + 60.0 * crossings + 6.0 * close + 3.0 * sharp
-          + 20.0 * bl_rms + 0.8 * ang_mad)
+          + 20.0 * bl_rms + 0.8 * ang_mad
+          + 5.0 * crowd + 120.0 * seg_close
+          + 40.0 * max( 0.0, 0.45 - min_seg))
 
 
 def _polish_layout( mol):
@@ -369,30 +409,81 @@ def _pick_best_layout( make_mol, tries):
   (it iterates over sets of atoms), and while most layouts of a
   larger molecule are usable, some fold a chain back over the rest
   or place a ring on top of another fragment. Generate a few and
-  keep the best one by (severe clashes, crossings, close pairs,
-  min distance); stop early on a clean layout. Deterministic in
-  count and selection rule; exceptions from make_mol propagate."""
+  keep the best one by (severe clashes, crossings, atoms lying on
+  bonds, crowded pairs, close pairs, min distance); stop early on
+  a clean layout. The atom-on-bond and crowding terms matter: a
+  chain folded flat across the core can keep every atom-atom
+  distance respectable while looking tangled, and only those
+  terms see it. Deterministic in count and selection rule;
+  exceptions from make_mol propagate."""
   best = None
   best_key = None
   for _try in range( tries):
     mol = make_mol()
     atoms, bonds, neighbours, _ap, _rp, _bl = _layout_terms( mol)
     pos = [[a.x, a.y] for a in atoms]
-    min_nb, severe, close, crossings = _layout_metrics( pos, bonds, neighbours)[:4]
-    key = (severe, crossings, close, -min_nb)
+    met = _layout_metrics( pos, bonds, neighbours)
+    min_nb, severe, close, crossings = met[:4]
+    crowd, seg_close = met[7], met[9]
+    key = (severe, crossings, seg_close, crowd, close, -min_nb)
     if best_key is None or key < best_key:
       best, best_key = mol, key
-    if severe == 0 and crossings == 0 and min_nb >= 0.9:
+    if severe == 0 and crossings == 0 and seg_close == 0 and min_nb >= 0.9:
       break
   return best
 
 
-def read_smiles( text, paper):
+def _read_via_openbabel( text, input_format, paper, program):
+  """Read a SMILES or InChI string with the external OpenBabel
+  program (obabel): the text goes to a temporary file, obabel
+  converts it to a molfile with generated 2D coordinates, and the
+  molfile is read back. Returns a BKChem molecule, or None when
+  OpenBabel could not handle the input - the caller then falls
+  back to the built-in oasa reader. OpenBabel writes y-up
+  coordinates while the BKChem canvas is y-down, so the layout is
+  mirrored on the way in; without the flip every stereocenter
+  would come out inverted (the same correction the CML importer
+  applies to foreign files)."""
+  try:
+    with tempfile.TemporaryDirectory() as td:
+      fin = os.path.join( td, "in." + ("smi" if input_format == "smi" else "inchi"))
+      fout = os.path.join( td, "out.mol")
+      with open( fin, "w", encoding="utf-8") as f:
+        f.write( text)
+      kwargs = {}
+      if os.name == "nt":
+        # do not flash a console window from the GUI application
+        kwargs["creationflags"] = getattr( subprocess, "CREATE_NO_WINDOW", 0)
+      subprocess.run( [program, "-i" + input_format, fin,
+                       "-omol", "--gen2d", "-O", fout],
+                      capture_output=True, timeout=60, **kwargs)
+      if not os.path.isfile( fout) or os.path.getsize( fout) == 0:
+        return None
+      with open( fout) as f:
+        mol = oasa.molfile.file_to_mol( f)
+  except Exception:
+    return None
+  if mol is None or not mol.atoms:
+    return None
+  ys = [a.y for a in mol.atoms if a.y is not None]
+  if ys:
+    yc = (max( ys) + min( ys)) / 2.0
+    for a in mol.atoms:
+      if a.y is not None:
+        a.y = 2 * yc - a.y
+  return oasa_mol_to_bkchem_mol( mol, paper)
+
+
+def read_smiles( text, paper, openbabel_program=None):
+  if openbabel_program and os.path.isfile( openbabel_program):
+    m = _read_via_openbabel( text, "smi", paper, openbabel_program)
+    if m is not None:
+      return m
   def make_mol():
     mol = oasa.smiles.text_to_mol( text)
     oasa.coords_generator.calculate_coords( mol, bond_length=1.0, force=1)
     return mol
-  mol = _pick_best_layout( make_mol, 6)
+  mol = _pick_best_layout( make_mol, 12)
   _resolve_coordinate_overlaps( mol)
   _polish_layout( mol)
   m = oasa_mol_to_bkchem_mol( mol, paper)
@@ -585,10 +676,14 @@ def _add_tetrahedral_stereochemistry_from_bonds( oasa_mol):
     oasa_mol.add_stereochemistry( st)
 
 
-def read_inchi( text, paper):
+def read_inchi( text, paper, openbabel_program=None):
+  if openbabel_program and os.path.isfile( openbabel_program):
+    m = _read_via_openbabel( text, "inchi", paper, openbabel_program)
+    if m is not None:
+      return m
   def make_mol():
     return oasa.inchi.text_to_mol( text, calc_coords=1, include_hydrogens=False)
-  mol = _pick_best_layout( make_mol, 3)
+  mol = _pick_best_layout( make_mol, 8)
   _resolve_coordinate_overlaps( mol)
   _polish_layout( mol)
   m = oasa_mol_to_bkchem_mol( mol, paper)

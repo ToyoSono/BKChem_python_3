@@ -1190,7 +1190,7 @@ class graph( object):
 
   def _get_some_cycles( self):
     if len( self.vertices) <= 2:
-      raise StopIteration
+      return
     self.mark_vertices_with_distance_from( self.vertices[0])
     for end in self._get_all_ring_end_points():
       for start in self._get_all_ring_start_points():
@@ -1347,7 +1347,7 @@ def filter_off_dependent_cycles( cycles):
   """this filtres off all cycles that are combinations of smaller cycles."""
   cs = list( cycles)
   level = 2
-  cs.sort( lambda a,b: -len( a) + len(b))
+  cs.sort( key=len, reverse=True)  # longest cycles first (was cmp-style sort)
   while level < len( cs):
     to_del = set()
     for c in cs:

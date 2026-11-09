@@ -390,10 +390,10 @@ class molecule( graph.graph):
     they will be properly localized but marked as non-aromatic"""
     erings = self.get_smallest_independent_cycles_e()
     # filter off rings without aromatic bonds
-    erings = filter( lambda x: len( [b for b in x if b.aromatic]), erings)
-    rings = map( self.edge_subgraph_to_vertex_subgraph, erings)
+    erings = list( filter( lambda x: len( [b for b in x if b.aromatic]), erings))
+    rings = list( map( self.edge_subgraph_to_vertex_subgraph, erings))
     # sort rings
-    rings.sort( lambda x,y: len(y)%2 - len(x)%2) # odd size rings first
+    rings.sort( key=lambda r: len( r) % 2, reverse=True) # odd size rings first
     last_rings = []
     while rings:
       # we have to continue with the neighbor rings of the last_ring (or the rings before)
