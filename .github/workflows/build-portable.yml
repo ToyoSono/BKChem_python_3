@@ -1,0 +1,90 @@
+# Build the portable Windows executable with PyInstaller and, for tag
+# pushes, attach BKChem-portable.zip to the GitHub Release of that tag.
+#
+# How it is used:
+#   * Push a tag whose name starts with "v" (e.g. v0.14.0-pre2-fork9):
+#     the build runs on a Windows runner and the zip is attached to the
+#     Release for that tag (the Release is created if it does not exist).
+#   * Run it manually from the Actions tab ("Run workflow"): the build
+#     runs the same way, but nothing is published - the zip is saved as
+#     a workflow artifact so it can be downloaded and inspected first.
+#
+# The build follows the manual procedure in the README: install the
+# dependencies, run PyInstaller with bkchem.spec (console=False as
+# registered), and zip the whole dist\BKChem folder.
+
+name: Build portable Windows executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.15
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.15'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pmw Pillow pycairo pywin32 PyInstaller
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller --noconfirm bkchem.spec
+
+      - name: Check the build result
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'dist/BKChem/BKChem.exe')) {
+            throw 'BKChem.exe was not produced'
+          }
+          if (-not (Test-Path 'dist/BKChem/_internal')) {
+            throw 'The _internal folder was not produced'
+          }
+          Get-ChildItem 'dist/BKChem' | Select-Object Name
+
+      # Informational only: a frozen build that starts does not prove
+      # the import/export plugins were bundled, so this step never
+      # fails the workflow - it only reports whether the exe stayed up.
+      - name: Smoke test - the exe starts and stays up (informational)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $p = Start-Process 'dist/BKChem/BKChem.exe' -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            Write-Warning "BKChem.exe exited early (exit code $($p.ExitCode))"
+          } else {
+            Write-Host 'BKChem.exe is running - startup looks good'
+            Stop-Process -Id $p.Id
+          }
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: Compress-Archive -Path 'dist/BKChem/*' -DestinationPath 'BKChem-portable.zip'
+
+      - name: Attach the zip to the release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BKChem-portable.zip
+
+      - name: Save the zip as a workflow artifact (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BKChem-portable
+          path: BKChem-portable.zip
