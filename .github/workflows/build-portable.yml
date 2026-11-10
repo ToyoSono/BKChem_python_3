@@ -6,8 +6,9 @@
 #     the build runs on a Windows runner and the zip is attached to the
 #     Release for that tag (the Release is created if it does not exist).
 #   * Run it manually from the Actions tab ("Run workflow"): the build
-#     runs the same way, but nothing is published - the zip is saved as
-#     a workflow artifact so it can be downloaded and inspected first.
+#     runs the same way, but nothing is published - the contents of the
+#     build folder (BKChem.exe and _internal) are saved as a workflow
+#     artifact, so one unzip gives the same layout as the release zip.
 #
 # The build follows the manual procedure in the README: install the
 # dependencies, run PyInstaller with bkchem.spec (console=False as
@@ -30,10 +31,10 @@ jobs:
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.15
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.15'
 
@@ -72,19 +73,25 @@ jobs:
             Stop-Process -Id $p.Id
           }
 
-      - name: Zip the portable build
+      - name: Zip the portable build (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: Compress-Archive -Path 'dist/BKChem/*' -DestinationPath 'BKChem-portable.zip'
 
       - name: Attach the zip to the release (tag builds only)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: BKChem-portable.zip
 
-      - name: Save the zip as a workflow artifact (manual runs only)
+      # No zip of our own here: GitHub wraps artifacts in a zip anyway,
+      # so uploading the folder contents directly keeps the download
+      # single-layered - one unzip gives BKChem.exe and _internal.
+      - name: Save the build as a workflow artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BKChem-portable
-          path: BKChem-portable.zip
+          path: |
+            dist/BKChem/BKChem.exe
+            dist/BKChem/_internal/**
