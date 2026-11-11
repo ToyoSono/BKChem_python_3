@@ -178,6 +178,55 @@ def _layout_terms( mol):
   return atoms, bonds, neighbours, angle_pairs, repel_pairs, bond_length
 
 
+def _separate_coincident_atoms( mol):
+  """Separate atoms the generator placed at (nearly) the same point.
+
+  The raw generated layout is used as-is (see read_smiles()), but two
+  non-bonded atoms printed at exactly the same coordinates cannot be
+  read at all - one of them is invisible and the pair looks fused.
+  Only such coincident pairs (closer than 5% of a bond length) are
+  touched: the second atom of the pair is moved away to 0.6 bond
+  lengths along a deterministic direction. Close-but-readable pairs
+  and everything else keep the generator's coordinates exactly."""
+  atoms = list( mol.vertices)
+  if len( atoms) < 2 or None in [a.x for a in atoms] + [a.y for a in atoms]:
+    return
+  bonded = set()
+  for e in mol.edges:
+    v1, v2 = e.vertices
+    bonded.add( (id( v1), id( v2)))
+    bonded.add( (id( v2), id( v1)))
+  lengths = [math.hypot( e.vertices[0].x - e.vertices[1].x,
+                         e.vertices[0].y - e.vertices[1].y) for e in mol.edges]
+  if not lengths:
+    return
+  lengths.sort()
+  bond_length = lengths[len( lengths) // 2] or 1.0
+  eps = 0.05 * bond_length
+  target = 0.6 * bond_length
+  for _pass in range( 50):
+    moved = False
+    for i in range( len( atoms)):
+      for j in range( i + 1, len( atoms)):
+        if (id( atoms[i]), id( atoms[j])) in bonded:
+          continue
+        dx = atoms[j].x - atoms[i].x
+        dy = atoms[j].y - atoms[i].y
+        d = math.hypot( dx, dy)
+        if d >= eps:
+          continue
+        moved = True
+        if d < 1e-9:
+          # no separating direction of their own; use a fixed
+          # pseudo-random one so the result is the same on every run
+          ang = (((i + 1) * 73856093) ^ ((j + 1) * 19349663)) % 6283 / 1000.0
+          dx, dy, d = math.cos( ang), math.sin( ang), 1.0
+        atoms[j].x = atoms[i].x + target * dx / d
+        atoms[j].y = atoms[i].y + target * dy / d
+    if not moved:
+      return
+
+
 def _layout_metrics( pos, bonds, neighbours):
   """Quality measures of one layout, distances relative to the
   median bond length: (min non-bonded distance, number of pairs
@@ -484,8 +533,14 @@ def read_smiles( text, paper, openbabel_program=None):
     oasa.coords_generator.calculate_coords( mol, bond_length=1.0, force=1)
     return mol
   mol = _pick_best_layout( make_mol, 12)
-  _resolve_coordinate_overlaps( mol)
-  _polish_layout( mol)
+  _separate_coincident_atoms( mol)
+  # The generator's raw layout is otherwise used as-is: the general
+  # overlap removal and the polish pass are deliberately not applied
+  # (owner's decision, 2026-11-10 - their regular ring geometry was
+  # judged to look better than the untangled result, e.g. for
+  # Phloxine B). Only exactly coincident atoms are separated, since
+  # two atoms printed at one point cannot be read at all. The unused
+  # helpers stay in this module in case that decision is revisited.
   m = oasa_mol_to_bkchem_mol( mol, paper)
   _apply_tetrahedral_stereochemistry( mol, m, _smiles_chiral_orders( text))
   return m
@@ -684,8 +739,8 @@ def read_inchi( text, paper, openbabel_program=None):
   def make_mol():
     return oasa.inchi.text_to_mol( text, calc_coords=1, include_hydrogens=False)
   mol = _pick_best_layout( make_mol, 8)
-  _resolve_coordinate_overlaps( mol)
-  _polish_layout( mol)
+  _separate_coincident_atoms( mol)
+  # Raw generator layout, as in read_smiles() - see the note there.
   m = oasa_mol_to_bkchem_mol( mol, paper)
   return m
   

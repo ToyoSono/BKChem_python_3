@@ -21,9 +21,8 @@
 """here is the http server that server data from application on demand"""
 
 
-import BaseHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from . import xml_writer
-import string
 from . import xml_serializer
 import xml.dom.minidom as dom
 import time
@@ -33,20 +32,20 @@ from .singleton_store import Store
 
 
 
-class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
+class bkchem_http_handler( BaseHTTPRequestHandler):
 
   dirs = ('smiles','inchi','gtml')
 
   def __init__( self, *args):
-    BaseHTTPServer.BaseHTTPRequestHandler.__init__( self, *args)
+    BaseHTTPRequestHandler.__init__( self, *args)
 
   def do_GET( self):
-    path_list = filter( None, self.path.split("/"))
+    path_list = list( filter( None, self.path.split("/")))
 
     if len( path_list) == 1 or path_list[0] not in self.dirs:
       # these are static pages
-      path = string.replace( self.path, ".", "_")
-      path = string.replace( path, "/", "__")
+      path = self.path.replace( ".", "_")
+      path = path.replace( "/", "__")
       method = 'serve' + path
 
       if method in self.__class__.__dict__:
@@ -66,7 +65,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
     doc = dom.Document()
     xml_serializer.serialize( Store.app.paper, doc, doc)
-    self.wfile.write( doc.toxml())
+    self.wfile.write( doc.toxml().encode( "utf-8"))
     print("%.2f ms" % (1000*(time.time() - t)))
 
   def serve__content_svg( self):
@@ -76,7 +75,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
     exporter = xml_writer.SVG_writer( Store.app.paper)
     exporter.construct_dom_tree( Store.app.paper.top_levels)
-    self.wfile.write( exporter.document.toxml())
+    self.wfile.write( exporter.document.toxml().encode( "utf-8"))
 
 
   def servedir_smiles( self, path_list):
@@ -108,7 +107,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header("Content-Type", "text/html")
     self.end_headers()    
 
-    self.wfile.write("<html><body><h1>Bad request</h1><p>This address does not exist</p></body></html>")
+    self.wfile.write( "<html><body><h1>Bad request</h1><p>This address does not exist</p></body></html>".encode( "utf-8"))
 
 
   # LOGGING
@@ -126,8 +125,8 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 
-class bkchem_http_server( BaseHTTPServer.HTTPServer):
+class bkchem_http_server( HTTPServer):
 
   def __init__( self, *args):
-    BaseHTTPServer.HTTPServer.__init__( self, *args)
+    HTTPServer.__init__( self, *args)
 

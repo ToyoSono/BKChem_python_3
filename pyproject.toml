@@ -38,8 +38,6 @@ bkchem = "bkchem.main:main"
 "Bug Tracker" = "https://github.com/vijaymasand/BKChem_python_3/issues"
 
 [tool.setuptools]
-# This line is crucial for your 'src' folder layout
-package-dir = {"" = "src"}
 packages = ["bkchem", "bkchem.oasa", "bkchem.oasa.oasa", "bkchem.oasa.oasa.graph", "bkchem.plugins", "bkchem.plugins.piddle"]
 
 [tool.setuptools.package-data]

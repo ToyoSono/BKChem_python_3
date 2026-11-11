@@ -19,10 +19,9 @@
 
 import os, sys, re
 from . import oasa_exceptions
-try:
-    from pysqlite2 import dbapi2 as sqlite
-except ImportError as e:
-    raise Exception( "The required pysqlite module could not be loaded. More info here: '%s'" % e)
+# pysqlite2 was a Python 2-era external package; the standard library
+# sqlite3 module provides the same connect()/OperationalError API used below.
+import sqlite3 as sqlite
 
 from . import inchi
 
@@ -58,9 +57,9 @@ def _open_infile( infilename):
     if os.path.isfile( infilename):
         if infilename.endswith(".gz"):
             import gzip
-            f = gzip.open( infilename, "r")
+            f = gzip.open( infilename, "rt")
         else:
-            f = file( infilename, "r")
+            f = open( infilename, "r")
         return f
     else:
         return None
@@ -119,7 +118,7 @@ def get_compounds_from_database( database_file=None, **kw):
             kw['inchikey'] = inchi_key.key_from_inchi( kw['inchi'])
         del kw['inchi']
     search = ["%s=?" % k for k in kw.keys()]
-    values = kw.values()
+    values = list( kw.values())  # Py3: dict.values() is a view, sqlite3 needs a sequence
     tables = "structures"
     if "synonym" in kw:
         tables = "structures, synonyms"

@@ -1127,8 +1127,14 @@ def get_sha256( text):
     # standard library hashlib since Python 2.5
     hasher = hashlib.sha256()
 
+  # Py3: hashlib needs bytes, not str; and the callers below index the
+  # digest with ord(), which in Py2 worked on 1-char strs but in Py3
+  # bytes elements are ints - decode back with latin-1 so each digest
+  # byte becomes the same 1-char str it was in Py2.
+  if isinstance( text, str):
+    text = text.encode( "utf-8")
   hasher.update( text)
-  return hasher.digest()
+  return hasher.digest().decode( "latin-1")
 
 
 def triplet1( key):

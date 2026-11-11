@@ -21,14 +21,13 @@
 """here is the http server that server data from application on demand"""
 
 
-import BaseHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from . import xml_writer
-import string
 from . import xml_serializer
 import xml.dom.minidom as dom
 import time
 import os.path
-import urlparse
+from urllib.parse import urlparse
 
 from . import oasa_bridge
 
@@ -37,21 +36,21 @@ from .singleton_store import Store
 
 
 
-class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
+class bkchem_http_handler( BaseHTTPRequestHandler):
 
   dirs = ('smiles','inchi','gtml','images')
 
   def __init__( self, *args):
-    BaseHTTPServer.BaseHTTPRequestHandler.__init__( self, *args)
+    BaseHTTPRequestHandler.__init__( self, *args)
 
   def do_GET_fallback( self):
-    protocol, address, path, parameters, query, fragment = urlparse.urlparse( self.path)
-    path_list = filter( None, path.split("/"))
+    protocol, address, path, parameters, query, fragment = urlparse( self.path)
+    path_list = list( filter( None, path.split("/")))
 
     if len( path_list) == 1 or path_list[0] not in self.dirs:
       # these are static pages
-      path = string.replace( path, ".", "_")
-      path = string.replace( path, "/", "__")
+      path = path.replace( ".", "_")
+      path = path.replace( "/", "__")
       method = 'serve' + path
 
       if method in self.__class__.__dict__:
@@ -71,7 +70,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
     doc = dom.Document()
     xml_serializer.serialize( Store.app.paper, doc, doc)
-    self.wfile.write( doc.toxml())
+    self.wfile.write( doc.toxml().encode( "utf-8"))
     print("%.2f ms" % (1000*(time.time() - t)))
 
   def serve__content_svg( self):
@@ -81,7 +80,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
     exporter = xml_writer.SVG_writer( Store.app.paper)
     exporter.construct_dom_tree( Store.app.paper.top_levels)
-    self.wfile.write( exporter.document.toxml())
+    self.wfile.write( exporter.document.toxml().encode( "utf-8"))
 
 
 
@@ -134,7 +133,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
     </body>
     </html>
     ''' % {'smiles': self._get_all_smiles()}
-    self.wfile.write( result)
+    self.wfile.write( result.encode( "utf-8"))
    
 
 
@@ -182,12 +181,12 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header("Content-Type", "text/html")
     self.end_headers()    
 
-    self.wfile.write("<html><body><h1>Bad request</h1><p>This address does not exist</p></body></html>")
+    self.wfile.write( "<html><body><h1>Bad request</h1><p>This address does not exist</p></body></html>".encode( "utf-8"))
 
 
 
   def do_GET( self):
-    protocol, address, path, parameters, query, fragment = urlparse.urlparse( self.path)
+    protocol, address, path, parameters, query, fragment = urlparse( self.path)
     if path == "/" or path == "content.html":
       attrs = self._get_attrs( query)
       if "action" in attrs:
@@ -249,7 +248,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header("Content-Type", "text/xml")
     self.end_headers()
 
-    self.wfile.write( text)
+    self.wfile.write( text.encode( "utf-8"))
 
 
   def _serve_file( self, filename, content_type="image/png"):
@@ -257,7 +256,7 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header("Content-Type", content_type)
     self.end_headers()
     
-    f = file( filename, "rb")
+    f = open( filename, "rb")
     self.wfile.write( f.read())
     f.close()
     
@@ -296,10 +295,10 @@ class bkchem_http_handler( BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 
-class bkchem_http_server( BaseHTTPServer.HTTPServer):
+class bkchem_http_server( HTTPServer):
 
   def __init__( self, *args):
-    BaseHTTPServer.HTTPServer.__init__( self, *args)
+    HTTPServer.__init__( self, *args)
 
 
 

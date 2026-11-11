@@ -4,11 +4,24 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 9 — 2026-11-10
+
+### Added / Changed
+
+- **The build of the portable releases is automated by GitHub Actions**: (`.github/workflows/build-portable.yml`)
+
+### Fixed
+
+- **The bugs in the experimental web server module are fixed**: The Python 2 code in `http_server.py` and `http_server2.py` was fixed so that they would pass the import and handler functionality tests. Note that the `start_server()` function in `main.py`—the only file that calls these scripts—has been commented out. (`bkchem/http_server.py`, `bkchem/http_server2.py`)
+- **The final processing for Read SMILES / Read InChI is modified**: The final processing of the structural formula generation program within BKChem is modified to use a more conservative approach: only atoms that are virtually completely overlapping (less than 5% of the bond length) are separated to 0.6 bond lengths. While the conversion of compounds that are resistant to deformation, such as Phloxine B, has improved, compounds with longer carbon chains, such as α-Tocopherol acetate, sometimes result in entangled structures when converted. In such cases, reloading helps. However, using OpenBabel is recommended instead. (`bkchem/oasa_bridge.py`)
+- **Structure database module is fixed**: This is a library feature that oasa silently disabled when the import failed, as there was no place in the BKChem menu to call this module. The now-deprecated external package `pysqlite2` has been replaced by the standard library’s `sqlite3`. Three instances within the same file (`file()`, opening a file in gzip text mode, and passing `dict.values()` to `sqlite3`) are also fixed. (`bkchem/oasa/oasa/structure_database.py`)
+- **InChIKey generation is fixed**: `get_sha256()` passed a `str` to `hashlib`, which raises `TypeError` on Python 3, so the whole `inchi_key` module was unusable and oasa silently disabled it. The digest is now computed from UTF-8 bytes and decoded back with latin-1, so the existing `ord()`-based code sees the same characters as on Python 2. Verified against official keys for ethanol, water, benzene, acetic acid and methane (5/5 match). This is only the fallback used when the external InChI program returns no key — Generate InChI via `inchi-1.exe` is unaffected. (`bkchem/oasa/oasa/inchi_key.py`)
+
 ## Fork release 8 — 2026-11-09
 
 ### Added / Changed
 
-- **Chemistry → Read SMILES and Read InChI can now use OpenBabel**: a new Options → OpenBabel program path setting points BKChem at `obabel.exe` / `obabel`; when set, both readers are handled by OpenBabel (parsing plus 2D coordinates via `--gen2d`, imported as MOL), which generally draws more regular layouts — Toyohide's decision after comparing Phloxine B, where OpenBabel's bond lengths and angles were visibly more uniform. If the program is missing or cannot read an input, BKChem silently falls back to its own oasa reader, and leaving the path empty restores the previous behaviour exactly. One subtlety found in verification: OpenBabel's coordinates are y-up while BKChem's canvas is y-down, so the import flips y — without it every stereocentre inverted (9/48 on the stereo battery; 48/48 with the flip). Bonus on the OpenBabel path: multi-component (salt) InChI now loads (Brilliant Blue FCF, 53 atoms) and InChI stereo (/t) layers are drawn. Verified on Windows with OpenBabel 3.1.1 from the GitHub installer — the `pip install openbabel` package has no Python 3.15 wheel, so the installer, not pip, is the way to get `obabel.exe` (see "OpenBabel for reading SMILES and InChI" in the README). (`bkchem/oasa_bridge.py`, `bkchem/main.py`, `bkchem/interactors.py`)
+- **Chemistry → Read SMILES and Read InChI can now use OpenBabel**: a new Options → OpenBabel program path setting points BKChem at `obabel.exe` / `obabel`; when set, both readers are handled by OpenBabel (parsing plus 2D coordinates via `--gen2d`, imported as MOL), which generally draws more regular layouts — ToyoSono's decision after comparing Phloxine B, where OpenBabel's bond lengths and angles were visibly more uniform. If the program is missing or cannot read an input, BKChem silently falls back to its own oasa reader, and leaving the path empty restores the previous behaviour exactly. One subtlety found in verification: OpenBabel's coordinates are y-up while BKChem's canvas is y-down, so the import flips y — without it every stereocentre inverted (9/48 on the stereo battery; 48/48 with the flip). Bonus on the OpenBabel path: multi-component (salt) InChI now loads (Brilliant Blue FCF, 53 atoms) and InChI stereo (/t) layers are drawn. Verified on Windows with OpenBabel 3.1.1 from the GitHub installer — the `pip install openbabel` package has no Python 3.15 wheel, so the installer, not pip, is the way to get `obabel.exe` (see "OpenBabel for reading SMILES and InChI" in the README). (`bkchem/oasa_bridge.py`, `bkchem/main.py`, `bkchem/interactors.py`)
 
 ### Fixed
 
