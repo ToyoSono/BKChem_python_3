@@ -4,6 +4,20 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 10 — 2026-11-12
+
+### Added / Changed
+
+- **"Copy selection as SVG to clipboard" now pastes as a picture on Linux and macOS too**: On Linux, when `xclip` (X11) or `wl-copy` (Wayland, from the wl-clipboard package) is installed, the SVG is handed to that helper and offered as `image/svg+xml`, so SVG-aware applications paste a picture instead of the SVG source text; the helper stays resident, so the content also survives BKChem exiting. On macOS, when `pyobjc-framework-Cocoa` is installed, the SVG is placed on the system pasteboard as both `public.svg-image` and `public.utf8-plain-text`, like the Windows path. Without these helpers the previous behaviour (Tk clipboard, text only) is unchanged. The X11 path is verified; the Wayland and macOS paths follow the documented interfaces of the same helpers but have not been verified on real machines yet. (`bkchem/paper.py`)
+- **Modules that the application does not use are now marked as such**: `http_server.py`, `http_server2.py`, `svg_out.py`, `structure_database.py` and `name_database.py` carry a note at the top stating that the BKChem application itself does not use them, so readers no longer have to guess whether a feature exists. No behaviour change.
+
+### Fixed
+
+- **The oasa command-line converter works again**: `bkchem/oasa/convert.py` used the Python 2 builtins `file()` and `raw_input()` under bare `except` clauses, so every conversion failed with the misleading message "cannot open file ... for reading" (and exit code 0) even when the file existed. Verified: SMILES to MOL, SMILES round-trip and MOL to SMILES, including Brilliant Blue FCF (53 atoms, 57 bonds). (`bkchem/oasa/convert.py`)
+- **A Python 2 comparison builtin left in oasa's common module is fixed**: `is_uniquely_sorted()` fell back to `cmp`, which Python 3 removed, so calling it without a sorting function raised `NameError`. The in-application callers (the CIP code) always pass a sorting function, so this was not reachable from the GUI. (`bkchem/oasa/oasa/common.py`)
+- **oasa's standalone SVG writer works again**: `mol_to_svg()` in `svg_out.py` used `file()` and raised `NameError` whenever it was called. The BKChem application itself writes SVG through its own `xml_writer`, so this affected only direct users of the library function. (`bkchem/oasa/oasa/svg_out.py`)
+- **oasa's subsearch data readers and generator work again**: `subsearch.py` used `file()` in six places, and its data generator wrote raw `map` objects into the generated `subsearch_data.py`; both are fixed. The readers are marked deprecated in the module itself, and the live group search in Molecular Descriptors, which reads the already-generated data, is unchanged. (`bkchem/oasa/oasa/subsearch.py`)
+
 ## Fork release 9 — 2026-11-10
 
 ### Added / Changed

@@ -17,6 +17,10 @@
 
 #--------------------------------------------------------------------------
 
+# NOTE (ToyoSono fork): this module is part of the bundled oasa
+# library but is not used by the BKChem application itself. It is
+# kept for completeness.
+
 import os, sys
 import dbm as anydbm
 from . import inchi as inchimod

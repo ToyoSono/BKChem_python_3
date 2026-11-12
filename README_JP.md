@@ -29,7 +29,7 @@ Windows ユーザーには Python のインストールが不要なポータブ�
 フォーク後に行った修正・変更の概要です。
 
 - **設定が保存されるようになりました**: メニュー言語、ウィンドウサイズ、Options → Standard の値が再起動後も残ります。Tk 9 ＋ 日本語メニューでの起動時クラッシュも直しました。
-- **Windows 環境下で SVG コピーが画像として貼れるようになりました**: 「Selected to clipboard as SVG」は本物の `image/svg+xml` 画像をクリップボードに入れるようになり、MS Word などに SVG ソースの文字列ではなく、拡大縮小できるベクター図として貼れます。
+- **SVG コピーが画像として貼れるようになりました**: 「Selected to clipboard as SVG」は本物の `image/svg+xml` 画像をクリップボードに入れるようになり、MS Word などに SVG ソースの文字列ではなく、拡大縮小できるベクター図として貼れます。Linux では `xclip`（X11）または `wl-clipboard`（Wayland）ヘルパー、macOS では `pyobjc-framework-Cocoa` がインストールされている場合も同様です。無い場合は従来通り、SVG ソースがテキストとしてコピーされます。
 - **不可能な置換を拒否します**: 原子の価数を超える基の置換や原子記号の変更（例: 環の炭素に COOH を付ける）は、実際には無い結合を表示する代わりに「Can not replace」メッセージで拒否します。Undo も確実に動くよう直しました。
 - **壊れていた機能の修復**: ODF / OpenOffice Draw エクスポート、Align → Center（水平・垂直）、Chemistry → Check chemistry（以前は無言で常に「OK」でした）、＋記号の削除、Fragment overview のハイライト、マウスホイールズーム、3D 回転後の結合装飾の残像、など。
 - **ファイルダイアログが前回のフォルダを記憶**: 開く / 保存 / インポート / エクスポートのダイアログが、毎回 `C:\Windows\System32` からではなく前回使ったフォルダで開くようになりました。
@@ -69,6 +69,8 @@ Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 
 - **Pillow**（PIL フォーク）: `pip install Pillow`
 - **PyCairo**（任意、Cairo 系エクスポート用）: `pip install pycairo`
 - **pyWin32**（win32clipboard モジュール用、Windows のみ）: `pip install pywin32`
+- **xclip / wl-clipboard**（Linux のみ、任意。「Selected to clipboard as SVG」を画像として貼るため）: `sudo apt install xclip` / `sudo apt install wl-clipboard`
+- **PyObjC**（macOS のみ、任意。同上）: `pip install pyobjc-framework-Cocoa`
 - **PyInstaller**（ポータブル実行ファイルを作る場合のみ）: `pip install PyInstaller`
 
 ## クイックスタート
@@ -81,9 +83,17 @@ Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 
 
 2. **依存ライブラリを入れる**:
    ```bash
-   pip install Pmw Pillow pycairo pywin32
+   pip install Pmw Pillow pycairo
    ```
-   注: `pywin32` は Windows 用のパッケージです。Windows 以外の OS では外して実行してください。
+   Windows は pywin32 もインストールしてください。
+   ```bash
+   pip install pywin32
+   ```
+   macOS は pyobjc-framework-Cocoa もインストールしてください。
+   ```bash
+   pip install pyobjc-framework-Cocoa
+   ```
+   注: Linux でクリップボード経由の SVG コピーを行いたい方は、xclip（X11）または wl-clipboard（Wayland）をパッケージマネージャでインストールしてください。
 
 3. **BKChem を起動する**:
    ```bash

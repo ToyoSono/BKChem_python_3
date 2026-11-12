@@ -39,7 +39,7 @@ def gen_combinations_of_series( series):
 def is_uniquely_sorted( series, sorting_function=None):
   """you put a *sorted* series inside and get the information whether all the items
   are unique (there are no two same items)"""
-  sf = sorting_function or cmp
+  sf = sorting_function or (lambda a, b: (a > b) - (a < b))
   for i in range( len( series)-1):
     if sf( series[i], series[i+1]) == 0:
       return False

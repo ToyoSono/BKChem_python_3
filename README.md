@@ -29,7 +29,7 @@ A portable version that requires **no** Python installation is provided for Wind
 Highlights of the fixes and changes made after forking:
 
 - **Settings now persist**: the menu language, window size, and values set in Options → Standard survive a restart. A startup crash on Tk 9 with Japanese menus is also fixed.
-- **Copy as SVG pastes as a picture in the Windows environment**: "Selected to clipboard as SVG" now puts a real `image/svg+xml` image on the clipboard, so MS Word and similar applications paste a scalable vector figure instead of SVG source text.
+- **Copy as SVG pastes as a picture**: "Selected to clipboard as SVG" puts a real `image/svg+xml` image on the clipboard, so MS Word and similar applications paste a scalable vector figure instead of SVG source text. The same works on Linux when the `xclip` (X11) or `wl-clipboard` (Wayland) helper is installed, and on macOS when `pyobjc-framework-Cocoa` is installed; without them, the SVG source is copied as text, as before.
 - **Impossible replacements are refused**: group substitution and atom-symbol changes that would exceed an atom's valency (for example putting COOH on a ring carbon) are now refused with a "Can not replace" message instead of showing a bond that is not really there. Undo also works reliably again.
 - **Broken features repaired**: ODF / OpenOffice Draw export, Align → Center horizontally/vertically, Chemistry → Check chemistry (it silently always reported "OK" before), deletion of plus signs, Fragment overview highlights, mouse-wheel zoom, and leftover bond decorations after 3D rotation.
 - **File dialogs remember the last folder**: Open / Save / Import / Export dialogs reopen in the folder you used last time instead of always starting in `C:\Windows\System32`.
@@ -68,6 +68,8 @@ To run BKChem from source (for the portable executable above, none of this is ne
 - **Pillow** (PIL Fork): `pip install Pillow`
 - **PyCairo** (Optional, for Cairo-based exports): `pip install pycairo`
 - **pyWin32** (for the win32clipboard module, Windows only): `pip install pywin32`
+- **xclip / wl-clipboard** (Linux only, optional; lets "Selected to clipboard as SVG" paste as a picture): `sudo apt install xclip` / `sudo apt install wl-clipboard`
+- **PyObjC** (macOS only, optional; same purpose on macOS): `pip install pyobjc-framework-Cocoa`
 - **PyInstaller** (only if you want to build the portable executable): `pip install PyInstaller`
 
 ## Quick Start
@@ -80,10 +82,18 @@ To run BKChem from source (for the portable executable above, none of this is ne
 
 2. **Install dependencies**:
    ```bash
-   pip install Pmw Pillow pycairo pywin32
+   pip install Pmw Pillow pycairo
+   ```
+   On Windows, also install pywin32:
+   ```bash
+   pip install pywin32
+   ```
+   On macOS, also install pyobjc-framework-Cocoa:
+   ```bash
+   pip install pyobjc-framework-Cocoa
    ```
 
-   Note: `pywin32` is a Windows-only package — omit it on other operating systems.
+   Note: On Linux, if you want to copy SVG through the clipboard, install xclip (X11) or wl-clipboard (Wayland) with your package manager.
 
 3. **Launch BKChem**:
    ```bash

@@ -83,7 +83,7 @@ if outmode not in "sim":
 
 if inname:
   try:
-    infile = file( inname, 'r')
+    infile = open( inname, 'r')
   except:
     print("error: cannot open file %s for reading" % inname)
     print()
@@ -93,7 +93,7 @@ else:
 
 if outname:
   try:
-    outfile = file( outname, 'w')
+    outfile = open( outname, 'w')
   except:
     print("error: cannot open file %s for writing" % inname)
     print()
@@ -129,7 +129,7 @@ else:
   # interactive mode
   import readline
   try:
-    text = raw_input( recoding[inmode]+": ")
+    text = input( recoding[inmode]+": ")
   except:
     text = ''
   while text:
@@ -142,7 +142,7 @@ else:
     outfile.write("\n")
     sys.stderr.write( "processing time %.2f ms\n" % ((time.time()-t)*1000))
     try:
-      text = raw_input( recoding[inmode]+": ")
+      text = input( recoding[inmode]+": ")
     except:
       text = ''
 

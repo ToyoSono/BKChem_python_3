@@ -17,6 +17,10 @@
 
 #--------------------------------------------------------------------------
 
+# NOTE (ToyoSono fork): this module is part of the bundled oasa
+# library but is not used by the BKChem application itself (no menu
+# calls it). It is kept working on Python 3 for completeness.
+
 import os, sys, re
 from . import oasa_exceptions
 # pysqlite2 was a Python 2-era external package; the standard library

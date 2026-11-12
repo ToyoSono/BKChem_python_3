@@ -17,6 +17,10 @@
 
 #--------------------------------------------------------------------------
 
+# NOTE (ToyoSono fork): this module is not used by the BKChem
+# application - the only caller, start_server() in main.py, is
+# commented out. It is kept working on Python 3 for completeness.
+
 
 """here is the http server that server data from application on demand"""
 

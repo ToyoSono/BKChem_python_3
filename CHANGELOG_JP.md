@@ -4,6 +4,20 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 10 — 2026-11-12
+
+### 追加・変更（Added / Changed）
+
+- **「選択範囲を SVG としてクリップボードへコピー」が Linux と macOS でも画像として貼れるようになりました**: Linux では `xclip`（X11）または `wl-copy`（Wayland、wl-clipboard パッケージ）がインストールされている場合、SVG をそのヘルパーに渡して `image/svg+xml` 形式で提供するため、対応アプリには SVG ソースのテキストではなく画像として貼り付きます。ヘルパーが常駐するので、BKChem を終了しても内容が残ります。macOS では `pyobjc-framework-Cocoa` がインストールされている場合、Windows と同様に `public.svg-image` と `public.utf8-plain-text` の2形式でシステムのペーストボードに登録します。これらのヘルパーが無い場合は従来通り（Tk クリップボード、テキストのみ）です。X11 の経路は検証済みで、Wayland と macOS の経路は同じヘルパーの公開インターフェースに沿っていますが、実機では未検証です。（`bkchem/paper.py`）
+- **アプリ本体が使っていないモジュールに、その旨の注記を付けました**: `http_server.py`、`http_server2.py`、`svg_out.py`、`structure_database.py`、`name_database.py` の先頭に、BKChem アプリケーション自体は使っていないことを明記しました。動作に変更はありません。
+
+### 修正（Fixed）
+
+- **oasa のコマンドライン変換ツールが動くようになりました**: `bkchem/oasa/convert.py` が Python 2 の `file()` と `raw_input()` を素通しの `except` の下で使っていたため、ファイルが存在しても「cannot open file ... for reading」という誤ったメッセージで全ての変換が失敗していました（終了コードも 0）。SMILES から MOL、SMILES の往復、MOL から SMILES を確認済みで、ブリリアントブルー（53原子・57結合）でも変換できます。（`bkchem/oasa/convert.py`）
+- **oasa の共通モジュールに残っていた Python 2 の比較組み込みを修正しました**: `is_uniquely_sorted()` の既定値が Python 3 で削除された `cmp` で、比較関数を指定せずに呼ぶと `NameError` になりました。アプリ内の呼び出し元（CIP 判定）は常に関数を渡すため、GUI からは到達しません。（`bkchem/oasa/oasa/common.py`）
+- **oasa の単体 SVG ライターが動くようになりました**: `svg_out.py` の `mol_to_svg()` が `file()` を使っていて、呼ばれると `NameError` になりました。BKChem 本体の SVG 書き出しは自前の `xml_writer` が担当するため、影響するのはライブラリ関数を直接使う場合だけです。（`bkchem/oasa/oasa/svg_out.py`）
+- **oasa の部分構造データの読み取りと生成が動くようになりました**: `subsearch.py` の `file()` 6か所と、生成器が `map` オブジェクトを生成先の `subsearch_data.py` にそのまま書き出してしまう問題を修正しました。読み取り関数はモジュール内で deprecated と明記されているもので、Molecular Descriptors の実働の基検索（生成済みデータを参照）は不変です。（`bkchem/oasa/oasa/subsearch.py`）
+
 ## フォーク リリース 9 — 2026-11-10
 
 ### 追加・変更（Added / Changed）

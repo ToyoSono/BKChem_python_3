@@ -52,7 +52,7 @@ class substructure_search_manager( object):
   def _read_structure_file( self, name=""):
     """may be used to read data directly from source txt files.
     is deprecated in favor of automatically build subsearch_data.py module"""
-    f = file( name or self.substructure_def_file, "r")
+    f = open( name or self.substructure_def_file, "r")
     for line in f:
       l = line.strip()
       if l and not l.startswith( "#"):
@@ -64,7 +64,7 @@ class substructure_search_manager( object):
           to_ignore = parts[3].strip()
         else:
           to_ignore = ""
-        to_ignore = map( int, filter( None, to_ignore.split(",")))
+        to_ignore = list( map( int, filter( None, to_ignore.split(","))))
         if not name.strip():
           name = compound_type
         sub = substructure( name, compound_type, smiles=smiles_string, atoms_to_ignore=to_ignore)
@@ -76,7 +76,7 @@ class substructure_search_manager( object):
   def _read_ring_file( self, name=""):
     """may be used to read data directly from source txt files.
     is deprecated in favor of automatically build subsearch_data.py module"""
-    f = file( name or self.ring_def_file, "r")
+    f = open( name or self.ring_def_file, "r")
     for line in f:
       l = line.strip()
       if l and not l.startswith( "#"):
@@ -225,8 +225,8 @@ class substructure_search_manager( object):
 
   @classmethod
   def _data_files_to_python_module( self, structure_file=None, ring_file=None):
-    out = file( "subsearch_data.py", "w")
-    f = file( structure_file or self.substructure_def_file, "r")
+    out = open( "subsearch_data.py", "w")
+    f = open( structure_file or self.substructure_def_file, "r")
     print("""#--------------------------------------------------------------------------
 #     This file is part of OASA - a free chemical python library
 #     Copyright (C) 2003-2008 Beda Kosata <beda@zirael.org>
@@ -257,14 +257,14 @@ class substructure_search_manager( object):
           print("Invalid line in src file:", line[:-1], file=sys.stderr)
         elif len( parts) == 3:
           parts.append( "")
-        to_ignore = map( int, filter( None, parts[3].split(",")))
+        to_ignore = list( map( int, filter( None, parts[3].split(","))))
         parts[3] = to_ignore
         if not parts[1]:
           parts[1] = parts[0]
         print(tuple(parts), ",", file=out)
     print("]", file=out)
     f.close()
-    f = file( ring_file or self.ring_def_file, "r")
+    f = open( ring_file or self.ring_def_file, "r")
     print("rings = [", file=out)
     for line in f:
       l = line.strip()
@@ -376,7 +376,7 @@ if __name__ == "__main__":
   print(ssm.structures)
   #print ssm.structures.is_connected()
   dump = ssm.structures.get_graphviz_text_dump()
-  f = file( "dump.dot", "w")
+  f = open( "dump.dot", "w")
   f.write( dump)
   f.close()
 

@@ -1441,8 +1441,18 @@ class chem_paper( Canvas, object):
     With only the text format present (the previous behaviour) Word
     had nothing to paste but the text, so the SVG source itself was
     pasted into the document.
-    On other platforms, or if pywin32 is not available, the Tk
-    clipboard is used as before (text format only).
+    On Linux, if xclip (X11) or wl-clipboard (Wayland) is installed,
+    the SVG is handed to that helper instead: it stays resident as
+    the clipboard owner and serves the data as "image/svg+xml", so
+    SVG-aware applications paste a picture. Unlike the Windows path
+    the helper serves this one format only, so the SVG source is not
+    offered as text in that case.
+    On macOS, if pyobjc-framework-Cocoa is installed, the SVG is
+    placed on the system pasteboard in two types at the same time
+    ("public.svg-image" as data and "public.utf8-plain-text" as
+    text), like the Windows path.
+    On other platforms, or if none of the above is available, the
+    Tk clipboard is used as before (text format only).
     """
     cont, unique = self.selected_to_unique_top_levels()
     if not cont:
@@ -1476,6 +1486,59 @@ class chem_paper( Canvas, object):
           win32clipboard.SetClipboardData( win32con.CF_UNICODETEXT, xml)
         finally:
           win32clipboard.CloseClipboard()
+        Store.log( _("selected top_levels were exported to clipboard in SVG"))
+        return
+      except Exception as e:
+        Store.log( _("Failed to write SVG to clipboard: %s") % str(e), message_type="error")
+        # fall through to the Tk clipboard below
+
+    # --- macOS: put both types on the pasteboard via PyObjC ---
+    # (the same arrangement as the Windows path above, with
+    #  NSPasteboard in place of the Win32 clipboard: the SVG as data
+    #  under the "public.svg-image" type and as text under
+    #  "public.utf8-plain-text", registered in one session. The
+    #  pasteboard is held by the system, so - as on Windows - the
+    #  data survives BKChem exiting. pyobjc-framework-Cocoa is an
+    #  optional dependency, like pywin32 on Windows; without it the
+    #  Tk fallback below is used.)
+    import sys
+    if sys.platform == "darwin":
+      try:
+        from AppKit import NSData, NSPasteboard
+      except ImportError:
+        NSPasteboard = None
+      if NSPasteboard is not None:
+        try:
+          pb = NSPasteboard.generalPasteboard()
+          pb.clearContents()
+          svg_bytes = xml.encode( 'utf-8')
+          svg_data = NSData.dataWithBytes_length_( svg_bytes, len( svg_bytes))
+          pb.declareTypes_owner_( ["public.svg-image", "public.utf8-plain-text"], None)
+          if not pb.setData_forType_( svg_data, "public.svg-image"):
+            raise RuntimeError( "setData_forType_ failed for public.svg-image")
+          if not pb.setString_forType_( xml, "public.utf8-plain-text"):
+            raise RuntimeError( "setString_forType_ failed for public.utf8-plain-text")
+          Store.log( _("selected top_levels were exported to clipboard in SVG"))
+          return
+        except Exception as e:
+          Store.log( _("Failed to write SVG to clipboard: %s") % str(e), message_type="error")
+          # fall through to the Tk clipboard below
+
+    # --- Linux: hand the SVG to xclip (X11) or wl-copy (Wayland) ---
+    # Tk's clipboard can only carry text, so BKChem cannot offer an
+    # image/svg+xml target itself; these helpers can. The helper
+    # process stays resident as the selection owner after the call
+    # (and even after BKChem exits) and serves the data on request.
+    import shutil
+    import subprocess
+    helper = None
+    if os.environ.get( "WAYLAND_DISPLAY") and shutil.which( "wl-copy"):
+      helper = ["wl-copy", "--type", "image/svg+xml"]
+    elif os.environ.get( "DISPLAY") and shutil.which( "xclip"):
+      helper = ["xclip", "-selection", "clipboard", "-t", "image/svg+xml"]
+    if helper is not None:
+      try:
+        subprocess.run( helper, input=xml.encode( 'utf-8'), check=True, timeout=10)
         Store.log( _("selected top_levels were exported to clipboard in SVG"))
         return
       except Exception as e:
