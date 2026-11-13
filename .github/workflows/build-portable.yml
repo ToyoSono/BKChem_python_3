@@ -1,21 +1,38 @@
-# Build the portable Windows executable with PyInstaller and, for tag
-# pushes, attach BKChem-portable.zip to the GitHub Release of that tag.
+# Build the portable executables (Windows / Linux / macOS) with
+# PyInstaller and, for tag pushes, attach the archives to the GitHub
+# Release of that tag.
 #
 # How it is used:
-#   * Push a tag whose name starts with "v" (e.g. v0.14.0-pre2-fork9):
-#     the build runs on a Windows runner and the zip is attached to a
-#     DRAFT Release for that tag (created if it does not exist). Nothing
-#     becomes public until the draft is edited and published by hand.
-#   * Run it manually from the Actions tab ("Run workflow"): the build
-#     runs the same way, but nothing is published - the contents of the
-#     build folder (BKChem.exe and _internal) are saved as a workflow
-#     artifact, so one unzip gives the same layout as the release zip.
+#   * Push a tag whose name starts with "v" (e.g. v0.14.0-pre2-fork11):
+#     three jobs run in parallel, one per platform, and each attaches
+#     its archive to a DRAFT Release for that tag (created if it does
+#     not exist). Nothing becomes public until the draft is edited and
+#     published by hand - check that all three archives are attached
+#     and all three jobs are green before publishing.
+#   * Run it manually from the Actions tab ("Run workflow"): the builds
+#     run the same way, but nothing is published - the contents of each
+#     build folder are saved as workflow artifacts, one per platform.
 #
-# The build follows the manual procedure in the README: install the
-# dependencies, run PyInstaller with bkchem.spec (console=False as
-# registered), and zip the whole dist\BKChem folder.
+# Platform notes:
+#   * PyInstaller cannot cross-compile, so each archive is built on a
+#     runner of its own platform. The jobs share nothing but the
+#     release they attach to; the archive names are therefore distinct
+#     (a single shared name would make the jobs overwrite each other).
+#   * The Windows archive keeps the historical name BKChem-portable.zip.
+#     The Linux and macOS archives are .tar.gz so that the executable
+#     bit of the BKChem binary survives the round trip.
+#   * Linux is built on ubuntu-22.04 so the binary also runs on older
+#     distributions (glibc floor); building on the newest Ubuntu would
+#     silently raise that floor.
+#   * macOS is built on macos-latest (Apple Silicon, arm64). The app is
+#     unsigned, so users must open it via right-click -> Open the first
+#     time (Gatekeeper). Intel Macs are not covered.
+#   * Dependencies differ per platform: pywin32 is Windows-only, the
+#     macOS build adds pyobjc-framework-Cocoa (used by the SVG
+#     clipboard), and pycairo needs the system cairo library on Linux
+#     and macOS.
 
-name: Build portable Windows executable
+name: Build portable executables
 
 on:
   push:
@@ -28,7 +45,22 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      # One platform failing must not cancel the others: a partial
+      # draft release is easier to repair than no release at all.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            asset: BKChem-portable.zip
+          - platform: linux
+            os: ubuntu-22.04
+            asset: BKChem-portable-linux.tar.gz
+          - platform: macos
+            os: macos-latest
+            asset: BKChem-portable-macos.tar.gz
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out the repository
@@ -39,15 +71,39 @@ jobs:
         with:
           python-version: '3.15'
 
-      - name: Install dependencies
+      - name: Install system libraries (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev pkg-config
+
+      - name: Install system libraries (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install cairo pkg-config
+
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
         run: |
           python -m pip install --upgrade pip
           pip install Pmw Pillow pycairo pywin32 PyInstaller
 
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pmw Pillow pycairo PyInstaller
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pmw Pillow pycairo pyobjc-framework-Cocoa PyInstaller
+
       - name: Build with PyInstaller
         run: python -m PyInstaller --noconfirm bkchem.spec
 
-      - name: Check the build result
+      - name: Check the build result (Windows)
+        if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           if (-not (Test-Path 'dist/BKChem/BKChem.exe')) {
@@ -58,10 +114,18 @@ jobs:
           }
           Get-ChildItem 'dist/BKChem' | Select-Object Name
 
+      - name: Check the build result (Linux / macOS)
+        if: matrix.platform != 'windows'
+        run: |
+          test -x dist/BKChem/BKChem
+          test -d dist/BKChem/_internal
+          ls dist/BKChem
+
       # Informational only: a frozen build that starts does not prove
       # the import/export plugins were bundled, so this step never
-      # fails the workflow - it only reports whether the exe stayed up.
-      - name: Smoke test - the exe starts and stays up (informational)
+      # fails the workflow - it only reports whether the app stayed up.
+      - name: Smoke test - the app starts and stays up (Windows, informational)
+        if: matrix.platform == 'windows'
         shell: pwsh
         continue-on-error: true
         run: |
@@ -74,26 +138,60 @@ jobs:
             Stop-Process -Id $p.Id
           }
 
-      - name: Zip the portable build (tag builds only)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Smoke test - the app starts and stays up (Linux, informational)
+        if: matrix.platform == 'linux'
+        continue-on-error: true
+        run: |
+          timeout 8 xvfb-run -a ./dist/BKChem/BKChem
+          code=$?
+          if [ $code -eq 124 ]; then
+            echo 'BKChem was still running after 8s - startup looks good'
+          else
+            echo "BKChem exited early (exit code $code)"
+          fi
+
+      - name: Smoke test - the app starts and stays up (macOS, informational)
+        if: matrix.platform == 'macos'
+        continue-on-error: true
+        run: |
+          ./dist/BKChem/BKChem &
+          pid=$!
+          sleep 8
+          if kill -0 $pid 2>/dev/null; then
+            echo 'BKChem is running - startup looks good'
+            kill $pid
+          else
+            echo 'BKChem exited early'
+          fi
+
+      - name: Zip the portable build (Windows, tag builds only)
+        if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: Compress-Archive -Path 'dist/BKChem/*' -DestinationPath 'BKChem-portable.zip'
 
-      - name: Attach the zip to a draft release (tag builds only)
+      - name: Tar the portable build (Linux / macOS, tag builds only)
+        if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/')
+        run: tar -czf '${{ matrix.asset }}' -C dist BKChem
+
+      - name: Attach the archive to a draft release (tag builds only)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          files: BKChem-portable.zip
+          files: ${{ matrix.asset }}
 
-      # No zip of our own here: GitHub wraps artifacts in a zip anyway,
-      # so uploading the folder contents directly keeps the download
-      # single-layered - one unzip gives BKChem.exe and _internal.
+      # No archive of our own here: GitHub wraps artifacts in a zip
+      # anyway, so uploading the folder contents directly keeps the
+      # download single-layered for Windows. (For Linux / macOS the
+      # artifact zip does not preserve the executable bit; treat those
+      # artifacts as build checks only, the .tar.gz release archives
+      # are the distributable form.)
       - name: Save the build as a workflow artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
-          name: BKChem-portable
+          name: BKChem-portable-${{ matrix.platform }}
           path: |
             dist/BKChem/BKChem.exe
+            dist/BKChem/BKChem
             dist/BKChem/_internal/**
