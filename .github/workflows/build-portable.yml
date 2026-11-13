@@ -142,9 +142,14 @@ jobs:
         if: matrix.platform == 'linux'
         continue-on-error: true
         run: |
-          timeout 8 xvfb-run -a ./dist/BKChem/BKChem
-          code=$?
-          if [ $code -eq 124 ]; then
+          # The "|| code=$?" matters: the runner's bash uses -e, so a
+          # bare "timeout ..." line would abort the step with code 124
+          # before the result can be interpreted (and 124 is exactly
+          # the success signal here - timeout had to kill the app
+          # because it was still running).
+          code=0
+          timeout 8 xvfb-run -a ./dist/BKChem/BKChem || code=$?
+          if [ "$code" -eq 124 ]; then
             echo 'BKChem was still running after 8s - startup looks good'
           else
             echo "BKChem exited early (exit code $code)"
