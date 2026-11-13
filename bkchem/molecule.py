@@ -581,7 +581,7 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
 
 
   def flush_graph_to_file( self, name="/home/beda/oasa/oasa/mol.graph"):
-    f = file( name, 'w')
+    f = open( name, 'w')
     for a in self.atoms:
       f.write('%s ' % a.symbol)
     f.write('\n')
@@ -624,6 +624,19 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
 
 
 
+  def _preserve_show_hydrogens( self, old, v):
+    # When an existing atom is replaced by a new vertex (right-click
+    # Replace, typing a symbol over an atom, Edit -> set name), carry
+    # over the old atom's show-hydrogens flag - but only ever turn it
+    # on, never off, so a hydrogenated name such as "OH" (which sets
+    # the flag in set_name) or the paper standard is never clobbered.
+    # Only real atoms carry a stored flag: group/queryatom/textatom
+    # report show_hydrogens == 1 unconditionally as a mimic, so they
+    # must not be used as the source.
+    if isinstance( old, atom) and isinstance( v, atom):
+      v.show_hydrogens = old.show_hydrogens or v.show_hydrogens
+
+
   def create_vertex_according_to_text( self, old, text, interpret=1):
     if not interpret:
       v = self.create_vertex( vertex_class=textatom)
@@ -634,10 +647,12 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
     if val==1 and group.is_known_group( text):
       v = self.create_vertex( vertex_class=group)
       if v.set_name( text, occupied_valency=val):
+        self._preserve_show_hydrogens( old, v)
         return v
     for cls in (atom, queryatom, group, textatom):
       v = self.create_vertex( vertex_class=cls)
       if v.set_name( text, occupied_valency=val):
+        self._preserve_show_hydrogens( old, v)
         return v
 
 

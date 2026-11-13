@@ -4,6 +4,18 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 11 — 2026-11-13
+
+### Added / Changed
+
+- **The NIST WebBook plugins work again**: "Fetch from Webbook" (draw a structure from a name) and "Get Name (NIST Webbook)" (name and CAS for a selected molecule) were broken by a combination of the Python 2 `urllib` import, bytes/str handling of the download, BKChem API drift (`read_molfile()` now returns a list, `mol_to_inchi()` now returns three values) and a change in NIST's page headings. Verified on Windows: Fetch drew cyclopropane with CAS 75-19-4, and Get Name returned Benzene with CAS 71-43-2. (`plugins/fetch_from_webbook.py`, `plugins/fetch_name_from_webbook.py`)
+- **Portable builds for Linux and macOS are now provided alongside the Windows one**: the release now attaches `BKChem-portable-linux.tar.gz` (built on Ubuntu 22.04) and `BKChem-portable-macos.tar.gz` (Apple Silicon, unsigned) in addition to `BKChem-portable.zip`; both passed the automated build and startup checks but have not been verified on real machines yet. (`.github/workflows/build-portable.yml`)
+
+### Fixed
+
+- **The "show hydrogens in structural formula" preference now applies to new atoms**: the preference value read from the settings was overwritten with 0 whenever an atom was created, so new atoms were always born with hydrogens hidden even with the box checked; only typing "OH", turning Hydrogens on per atom, or loading a file showed them. New atoms now keep the preference value, and substitution keeps the original atom's setting. Verified on Windows: replacing a chain-end C with O now gives OH immediately. (`bkchem/atom.py`, `bkchem/molecule.py`)
+- **Five leftover Python 2 `file()` calls fixed**: in `bkchem/molecule.py` (584), `bkchem/oasa/oasa/molecule.py` (603), `bkchem/oasa/oasa/graph/graph.py` (1162), `bkchem/oasa/oasa/cdml.py` (141) and `bkchem/oasa/oasa/molfile.py` (404; the last two also convert a `map` object to a list). All five sit in demo or unused helper code, so no menu, drawing, import or export behaviour changes; the V3000 reader in `molfile.py` is unchanged.
+
 ## Fork release 10 — 2026-11-12
 
 ### Added / Changed

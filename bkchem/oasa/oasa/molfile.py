@@ -401,7 +401,7 @@ if __name__ == "__main__":
   # parsing of the file
 
   file_name = sys.argv[1]
-  f = file( file_name, 'r')
+  f = open( file_name, 'r')
   mol = file_to_mol( f)
   f.close()
 
@@ -411,7 +411,7 @@ if __name__ == "__main__":
   import time
 
   t = time.time()
-  lens = map( len, mol.get_smallest_independent_cycles())
+  lens = list( map( len, mol.get_smallest_independent_cycles()))
   lens.sort()
   print(lens)
   print(time.time() -t)

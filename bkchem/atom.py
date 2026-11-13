@@ -62,7 +62,16 @@ class atom( drawable_chem_vertex, oasa.atom):
 
     # chemistry attrs
     self.show = 0
-    self.show_hydrogens = 0
+    # NB: drawable_chem_vertex.__init__ above already read show_hydrogens
+    # from the paper standard (it is in meta__used_standard_values), so do
+    # not overwrite it here: with the Preferences option "show hydrogens"
+    # checked, every newly created atom otherwise came out with the flag
+    # off - e.g. replacing a terminal C by O stayed "O" instead of "OH",
+    # and a freshly drawn heteroatom never showed its hydrogens either.
+    # Only fall back to 0 when no standard was given at all (then the
+    # flag was never set by read_standard_values).
+    if not standard:
+      self.show_hydrogens = 0
     self.multiplicity = 1
 
     if package:

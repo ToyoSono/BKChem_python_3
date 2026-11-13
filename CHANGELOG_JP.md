@@ -4,6 +4,18 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 11 — 2026-11-13
+
+### 追加・変更（Added / Changed）
+
+- **NIST WebBook 連携プラグインが動くようになりました**: 「Fetch from Webbook」（名前から構造を描く）と「Get Name (NIST Webbook)」（選択した分子の名前と CAS を引く）が、Python 2 の `urllib` インポート、ダウンロード結果の bytes/str の扱い、BKChem 側の API 変更（`read_molfile()` がリストを返すように、`mol_to_inchi()` が3値を返すようになったのに未対応）、NIST 側のページ見出しの変更が重なって壊れていました。Windows で確認済み：Fetch でシクロプロパンの構造と CAS 75-19-4、Get Name でベンゼンの名前と CAS 71-43-2 が出ます。（`plugins/fetch_from_webbook.py`、`plugins/fetch_name_from_webbook.py`）
+- **ポータブル版を Linux / macOS 向けにも用意しました**: リリースに Windows 版 `BKChem-portable.zip` に加えて `BKChem-portable-linux.tar.gz`（Ubuntu 22.04 でビルド）と `BKChem-portable-macos.tar.gz`（Apple Silicon 向け、未署名）が付くようになりました。どちらも自動ビルドと起動確認は通っていますが、実機では未検証です。（`.github/workflows/build-portable.yml`）
+
+### 修正（Fixed）
+
+- **「構造式で表示した時水素を表示する」の設定が、新しく作る原子にも効くようになりました**: 環境設定から読み取った値が、原子を作るたびに 0 で上書きされていたため、チェックを入れていても新しい原子は常に水素非表示で生まれていました（「OH」と打つ・原子ごとに Hydrogens を on にする・ファイル読込のときだけ H が出ていました）。新しい原子は設定値を保ち、置換では元の原子の設定を引き継ぎます。Windows で確認済み：鎖末端の C を O に置換するとすぐ OH になります。（`bkchem/atom.py`、`bkchem/molecule.py`）
+- **Python 2 の `file()` の残り5か所を修正しました**: `bkchem/molecule.py`（584行目）、`bkchem/oasa/oasa/molecule.py`（603行目）、`bkchem/oasa/oasa/graph/graph.py`（1162行目）、`bkchem/oasa/oasa/cdml.py`（141行目）、`bkchem/oasa/oasa/molfile.py`（404行目。後二者は `map` オブジェクトのリスト化も含みます）。いずれもデモ用・未使用の補助コード内のため、メニュー・描画・入出力の動作に変更はありません。`molfile.py` の V3000 読み込みはそのままです。
+
 ## フォーク リリース 10 — 2026-11-12
 
 ### 追加・変更（Added / Changed）

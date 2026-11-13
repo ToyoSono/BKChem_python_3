@@ -1,8 +1,9 @@
 
-from urllib import urlopen
+from urllib.request import urlopen, Request
 import re
-import oasa_bridge
-import dialogs
+import io
+from bkchem import oasa_bridge
+from bkchem import dialogs
 
 
 molfile_link = re.compile( '(<a href=")(.*)(">2d Mol file</a>)')
@@ -15,7 +16,8 @@ def get_mol_from_web_molfile( name):
   url = "http://webbook.nist.gov/cgi/cbook.cgi?Name=%s&Units=SI" % ("+".join( name.split()))
   dialog.update( 0, top_text = _("Connecting to WebBook..."), bottom_text=url)
   try:
-    stream = urlopen( url)
+    stream = urlopen( Request( url, headers={"User-Agent": "Mozilla/5.0"}))
+    stream = io.TextIOWrapper( stream, encoding="utf-8", errors="replace")
   except IOError:
     dialog.close()
     return None
@@ -28,9 +30,9 @@ def get_mol_from_web_molfile( name):
     m = molfile_link.search( line)
     if m:
       dialog.update( 0.8, top_text = _("Reading the molfile..."), bottom_text=m.group(2))      
-      molfile = urlopen( "http://webbook.nist.gov" + m.group( 2))
+      molfile = urlopen( Request( "http://webbook.nist.gov" + m.group( 2), headers={"User-Agent": "Mozilla/5.0"}))
       stream.close()
-      ret = molfile.read()
+      ret = molfile.read().decode( "utf-8", "replace")
       molfile.close()
       dialog.close()
       return ret, cas
@@ -54,21 +56,25 @@ if res == _('OK'):
 
   # fetch the molfile
 
-  import StringIO
+  from io import StringIO
 
   molcas = get_mol_from_web_molfile( name)
   if molcas:
     mol, cas = molcas
     mol = StringIO( mol)
-    molec = oasa_bridge.read_molfile( mol, App.paper)
+    mols = oasa_bridge.read_molfile( mol, App.paper)
     mol.close()
-    App.paper.stack.append( molec)
-    molec.draw()
-    if cas:
-      t = App.paper.new_text( 280, 300, text="CAS: "+cas.strip())
-      t.draw()
-    App.paper.add_bindings()
-    App.paper.start_new_undo_record()
+    if not mols:
+      App.update_status( _("Sorry, molecule with name %s was not found") % name)
+    else:
+      molec = mols[0]
+      App.paper.stack.append( molec)
+      molec.draw()
+      if cas:
+        t = App.paper.new_text( 280, 300, text="CAS: "+cas.strip())
+        t.draw()
+      App.paper.add_bindings()
+      App.paper.start_new_undo_record()
   else:
     App.update_status( _("Sorry, molecule with name %s was not found") % name)
 

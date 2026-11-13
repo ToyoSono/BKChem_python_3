@@ -6,15 +6,16 @@ Ideas: 		Getting all alternative names from webbook and or other sources and
 	
 """
 
-from urllib import urlopen
+from urllib.request import urlopen, Request
+import io
 import re
-import oasa_bridge
-import dialogs
-from singleton_store import Store
-from main import interactors
+from bkchem import oasa_bridge
+from bkchem import dialogs
+from bkchem.singleton_store import Store
+from bkchem.main import interactors
 
 # search strings for the name and the cas registry number
-name_re = re.compile( '(<h1><a id="Top" name="Top">)(.*)(</a></h1>)')
+name_re = re.compile( '(<h1 id="Top">)(.*)(</h1>)')
 cas_re = re.compile('(<strong>CAS Registry Number:</strong>)(.*)(</li>)')
 stereoisomers = re.compile('(<li><a href=")(.*)(">)(.*)(</a></li>)')
 
@@ -29,7 +30,7 @@ def get_inchi_for_one(u):
 	if not interactors.check_validity( u):
 		return '',["validity Error",]	
 	try:
-		inchi_mol,warning=( oasa_bridge.mol_to_inchi( u, program))
+		inchi_mol, _inchi_key, warning = oasa_bridge.mol_to_inchi( u, program)
 #	except oasa.oasa_exceptions.oasa_inchi_error as e:
 #		sms = ["InChI generation failed,", "make sure the path to the InChI program is correct in 'Options/INChI program path'", "", str( e)]
 	except:
@@ -88,7 +89,8 @@ def download_nist( url):
 	dialog.update( 0, top_text = "Connecting to WebBook...", bottom_text=url)
 	sms=[]
 	try:
-		stream = urlopen( url)
+		stream = urlopen( Request( url, headers={"User-Agent": "Mozilla/5.0"}))
+		stream = io.TextIOWrapper( stream, encoding="utf-8", errors="replace")
 	except IOError:
 		dialog.close()
 		sms.append('Nist could not be reached.')

@@ -138,14 +138,14 @@ if __name__ == '__main__':
   # parsing of the file
 
   file_name = sys.argv[1]
-  f = file( file_name, 'r')
+  f = open( file_name, 'r')
   mol = file_to_mol( f)
   f.close()
 
   import time
 
   t = time.time()
-  lens = map( len, mol.get_all_cycles())
+  lens = list( map( len, mol.get_all_cycles()))
   lens.sort()
   print(lens)
   print(time.time() -t)
