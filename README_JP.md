@@ -6,12 +6,18 @@
 
 [English README](README.md) / [英語の変更履歴](CHANGELOG.md)
 
-## Windows 向けポータブル版のダウンロード
+## ポータブル版のダウンロード
 
-Windows ユーザーには Python のインストールが不要なポータブル版を用意しました。[Releases ページ](https://github.com/ToyoSono/BKChem_python_3/releases)から **`BKChem-portable.zip`** をダウンロードし、任意の場所に展開して、中の **`BKChem.exe`** を実行してください。
+インストールが不要なポータブル版を用意しました。以下の表を参考にしたうえで[Releases ページ](https://github.com/ToyoSono/BKChem_python_3/releases) から、インストールしたい OS に対応するアーカイブファイルをダウンロードし、展開してでてきた実行ファイル (**`BKChem`** または **`BKChem.exe`**) を起動してください。
 
-- `BKChem.exe` は隣の `_internal` フォルダと一緒でないと起動しません。離さないでください。
-- 実行ファイルにはコード署名がないため、初回起動時に Windows SmartScreen の警告が出ることがあります。「詳細情報」→「実行」の順にクリックすると起動できます。
+| OS | アーカイブファイル名 | 注意点 |
+|---|---|---|
+| Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono が自機で起動とimport / export を確認しました。コード署名がないため、初回起動時に Windows SmartScreen の警告が出ることがあります。「詳細情報」→「実行」の順にクリックすると起動できます|
+| Linux |  **`BKChem-portable-linux.tar.gz`** |Ubuntu 22.04 でビルドしており、それ以降のバージョンの OS で動作させるのを推奨します。X11 環境で利用しているなら xclip を、Wayland 環境で利用しているなら wl-clipboard をインストールしてください。実機での動作は未確認です|
+|macOS （Arm 版） | **`BKChem-portable-macos.tar.gz`**|実機での動作は未確認です。未署名のため初回は右クリック→開く が必要になります。|
+
+
+OS に依らない注意点: 実行ファイルは隣の `_internal` フォルダと同じ場所にないと起動しません。離さないでください。
 
 ## 主な機能
 
@@ -33,7 +39,7 @@ Windows ユーザーには Python のインストールが不要なポータブ�
 - **不可能な置換を拒否します**: 原子の価数を超える基の置換や原子記号の変更（例: 環の炭素に COOH を付ける）は、実際には無い結合を表示する代わりに「Can not replace」メッセージで拒否します。Undo も確実に動くよう直しました。
 - **壊れていた機能の修復**: ODF / OpenOffice Draw エクスポート、Align → Center（水平・垂直）、Chemistry → Check chemistry（以前は無言で常に「OK」でした）、＋記号の削除、Fragment overview のハイライト、マウスホイールズーム、3D 回転後の結合装飾の残像、など。
 - **ファイルダイアログが前回のフォルダを記憶**: 開く / 保存 / インポート / エクスポートのダイアログが、毎回 `C:\Windows\System32` からではなく前回使ったフォルダで開くようになりました。
-- **ポータブル版ビルド対応**: `run_bkchem.py` と `bkchem.spec` を同梱し、PyInstaller でポータブルな Windows 実行ファイルを作れるようにしました（手順は下記）。
+- **ポータブル版ビルド対応**: `run_bkchem.py` と `bkchem.spec` を同梱し、PyInstaller でポータブルな実行ファイルを作れるようにしました（手順は下記）。
 - **Generate InChI が使えるようになりました**: Chemistry → Generate InChI で、選択した構造式の InChI と InChIKey（立体化学を含む）を生成できます。公式 InChI プログラムを使うため、初回のみ設定が必要です（下記の「Generate InChI について」参照）。
 
 - **OpenBabel を利用した SMILES / InChI の読み込み**: OpenBabel との連携を設定すれば BKChem 単独では変換できなかった化合物の読み込みや安定した構造の生成ができるようになりました。（下記の「SMILES / InChI 読み込みと OpenBabel」参照）。
@@ -117,9 +123,9 @@ Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 
    ```
    補足: `bkchem.spec` はコンソールなし（`console=False`）で github に置いてます。コンソールが必要な方は、先に `bkchem.spec` の該当行を `console=True` に変えて実行してください。
 
-7. 成果物は **`dist\BKChem`** フォルダにできます（`BKChem.exe` と `_internal` フォルダ）。この2つは常に一緒に扱ってください。配布する場合は `dist\BKChem` フォルダ全体を zip（`BKChem-portable.zip`）にして、GitHub の Release に添付します。
+7. 成果物は **`dist\BKChem`** フォルダにできます（`BKChem` または `BKChem.exe` と `_internal` フォルダ）。この2つは常に一緒に扱ってください。
 
-   補足: GitHub の Releases で配布しているポータブル版は Windows 用です。同じ手順は Linux でも使えることを確認済みで、その場合の成果物は `dist/BKChem/BKChem`（拡張子なしの実行ファイルと `_internal` フォルダ）になります。macOS では未確認です。
+   補足: GitHub の Releases で Windows, Linux, macOS 用のポータブル版 BKChem の配布を始めました。
 
 
 

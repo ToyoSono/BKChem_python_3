@@ -4,6 +4,16 @@
 
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## フォーク リリース 12 — 2026-11-15
+
+### 追加・変更（Added / Changed）
+
+- **README が Linux / macOS 向けポータブル版にも対応しました**: 「Portable Version」の節で3つの OS 向けアーカイブ（`BKChem-portable.zip`、`BKChem-portable-linux.tar.gz`、`BKChem-portable-macos.tar.gz`）と注意事項を一覧できるようになり、ポータブル版が Windows だけであるかのような記述を改めました。（`README.md`、`README_JP.md`）
+
+### 修正（Fixed）
+
+- **Python 2 の `file()` の残り2か所を修正しました**: `bkchem/oasa/oasa/name_database.py`（57行目、gdbm データベース構築部。モジュールはアプリ本体からは使われておらず、gdbm は Windows では使えないため、実質的な変化はありません）と `bkchem/oasa/oasa/inchi_key.py`（1352行目、無効化された `if False:` テストブロック内。実際の InChIKey 生成には影響しません）。動作に変更はありません。
+
 ## フォーク リリース 11 — 2026-11-13
 
 ### 追加・変更（Added / Changed）

@@ -6,12 +6,18 @@ This repository is **ToyoSono's fork** of [vijaymasand/BKChem_python_3](https://
 
 [日本語版 README はこちら](README_JP.md) / [日本語の変更履歴](CHANGELOG_JP.md)
 
-## Portable Version for Windows
+## Portable Version
 
-A portable version that requires **no** Python installation is provided for Windows users. Download **`BKChem-portable.zip`** from the [Releases page](https://github.com/ToyoSono/BKChem_python_3/releases), unzip it anywhere, and run **`BKChem.exe`** inside the unzipped folder.
+A portable version that requires **no** Python installation is provided. Please refer to the table below, then go to the [Releases page](https://github.com/ToyoSono/BKChem_python_3/releases) to download the archive file corresponding to the OS you want to install it on. After extracting the file, launch the executable file (**`BKChem`** or **`BKChem.exe`**) that appears.
 
-- Keep `BKChem.exe` together with the `_internal` folder next to it — the program will not start without it.
-- The executable is not code-signed, so Windows SmartScreen may show a warning on first run. Click "More info" and then "Run anyway" to start it.
+| OS | Archive File Name | Notes |
+|---|---|---|
+| Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono has verified that it launches and performs import/export operations on his own machine. Since the file is not digitally signed, a Windows SmartScreen warning may appear upon first launch. Click “More info” → “Run anyway” to launch the program.|
+| Linux |  **`BKChem-portable-linux.tar.gz`** | Built on Ubuntu 22.04; running it on later versions of the OS is recommended. If you are using an X11 environment, please install xclip; if you are using a Wayland environment, please install wl-clipboard. Operation on actual hardware has not been verified.|
+| macOS (Arm version) | **`BKChem-portable-macos.tar.gz`** | Operation on physical devices has not been verified. Since the file is unsigned, you’ll need to right-click and select “Open” the first time you run it.|
+
+Important Note (Applies to All Operating Systems): The executable file will not run unless it is located in the same directory as the adjacent `_internal` folder. Please do not move it.
+
 
 ## Key Features
 
@@ -33,7 +39,7 @@ Highlights of the fixes and changes made after forking:
 - **Impossible replacements are refused**: group substitution and atom-symbol changes that would exceed an atom's valency (for example putting COOH on a ring carbon) are now refused with a "Can not replace" message instead of showing a bond that is not really there. Undo also works reliably again.
 - **Broken features repaired**: ODF / OpenOffice Draw export, Align → Center horizontally/vertically, Chemistry → Check chemistry (it silently always reported "OK" before), deletion of plus signs, Fragment overview highlights, mouse-wheel zoom, and leftover bond decorations after 3D rotation.
 - **File dialogs remember the last folder**: Open / Save / Import / Export dialogs reopen in the folder you used last time instead of always starting in `C:\Windows\System32`.
-- **Portable build support**: `run_bkchem.py` and `bkchem.spec` are included so a portable Windows executable can be built with PyInstaller (see below).
+- **Portable build support**: `run_bkchem.py` and `bkchem.spec` are included so a portable executable can be built with PyInstaller (see below).
 - **Generate InChI works again**: Chemistry → Generate InChI produces the InChI and InChIKey for the selected structure (including stereochemistry), using the official InChI program — see [Generate InChI](#generate-inchi) below for the one-time setup.
 
 - **Read SMILES / Read InChI can use OpenBabel**: with Options → OpenBabel program path set to `obabel.exe` / `obabel`, both readers are handled by OpenBabel (parsing plus 2D coordinates), which generally draws more regular layouts. Without the setting, or if OpenBabel fails, BKChem falls back to its own reader — see [OpenBabel for reading SMILES and InChI](#openbabel-for-reading-smiles-and-inchi) below for the one-time setup.
@@ -117,9 +123,9 @@ After steps 1–2 of Quick Start:
    ```
    Note: `bkchem.spec` is published on GitHub with `console=False` (no console window). If you need a console, change that line to `console=True` before building.
 
-7. The result is in the **`dist\BKChem`** folder: `BKChem.exe` together with an `_internal` folder. Both must stay together — to distribute it, zip the whole `dist\BKChem` folder (as `BKChem-portable.zip`) and attach the zip to a GitHub Release.
+7. The output files are located in the **`dist\BKChem`** folder (the `BKChem` or `BKChem.exe` file and the `_internal` folder). Please always treat these two together.
 
-   Note: the portable builds attached to GitHub Releases are for Windows. The same procedure has been verified to work on Linux, where the result is `dist/BKChem/BKChem` (an executable without an extension, next to the `_internal` folder). macOS is unverified.
+   Note: We have started distributing portable versions of BKChem for Windows, Linux, and macOS via GitHub Releases.
 
 
 

@@ -4,6 +4,16 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 12 — 2026-11-15
+
+### Added / Changed
+
+- **The README now covers the Linux and macOS portable builds**: the "Portable Version" section now lists the archives for all three operating systems (`BKChem-portable.zip`, `BKChem-portable-linux.tar.gz`, `BKChem-portable-macos.tar.gz`) with their notes, instead of describing the portable build as Windows-only. (`README.md`, `README_JP.md`)
+
+### Fixed
+
+- **Two more leftover Python 2 `file()` calls fixed**: in `bkchem/oasa/oasa/name_database.py` (line 57, inside the gdbm database builder; the module is not used by the application and gdbm is unavailable on Windows, so this changes nothing in practice) and `bkchem/oasa/oasa/inchi_key.py` (line 1352, inside a disabled `if False:` test block; real InChIKey generation is unaffected). No behaviour changes.
+
 ## Fork release 11 — 2026-11-13
 
 ### Added / Changed
