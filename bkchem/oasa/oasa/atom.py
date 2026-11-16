@@ -348,7 +348,25 @@ class atom( chem_vertex):
   def get_highest_possible_free_valency( self):
     """this is used in case of aromatic bonds - it takes all aromatic bonds as single,
     thus giving the maximum free valency that would be possible if all these localized to single"""
-    return self.valency - chem_vertex._get_occupied_valency( self)
+    valency = self.valency
+    # the plain occupied valency used below knows nothing of charge;
+    # apply the same correction as in _get_occupied_valency - an atom
+    # that accepts a cation (or anion) at charge +-1 has one more unit
+    # of bonding capacity than its plain valency suggests (e.g. the
+    # oxygen of a pyrylium ring, valency 2, can still take a double
+    # bond), any other charge reduces the capacity. Without this, a
+    # pyrylium oxygen is judged unable to take a double bond and its
+    # aromatic system is not localized at all.
+    if self.charge:
+      if abs( self.charge) > 1:
+        valency -= abs( self.charge)
+      elif (self.symbol in PT.accept_cation) and (self.charge == 1) and (self.valency <= PT.accept_cation[self.symbol]):
+        valency += 1
+      elif (self.symbol in PT.accept_anion) and (self.charge == -1) and (self.valency <= PT.accept_anion[self.symbol]):
+        valency += 1
+      else:
+        valency -= abs( self.charge)
+    return valency - chem_vertex._get_occupied_valency( self)
 
 
 def cip_sorting_function( a, b):

@@ -37,6 +37,14 @@ from . import oasa
 
 from .singleton_store import Store, Screen
 from functools import reduce
+from .atom import atom, _valency_can_accommodate, _raw_occupied_valency
+from .oasa import periodic_table as PT
+
+# Internationalization
+try:
+    _
+except NameError:
+    _ = lambda x: x
 
 
 ### NOTE: now that all classes are children of meta_enabled, so the read_standard_values method
@@ -1246,10 +1254,39 @@ class bond( meta_enabled, line_colored, drawable, with_line, interactive, child_
 
 
 
+  def _order_increase_fits( self, to_order):
+    """True if raising this bond to `to_order` keeps both end atoms
+    within their valency. The prospective occupied valency of each end
+    is its current occupied valency plus the order increase; the check
+    is the same _valency_can_accommodate test as the "Can not replace"
+    and drag-to-unify guards, so elements with several listed
+    valencies (e.g. S, valency 2/4/6) may still grow into a higher
+    one. Pairs involving groups, text atoms, query atoms or other
+    non-element vertices are not checked and keep the historical
+    behaviour."""
+    increase = to_order - self.order
+    for a in (self.atom1, self.atom2):
+      if not isinstance( a, atom):
+        continue
+      if a.symbol not in PT.periodic_table:
+        continue
+      if not _valency_can_accommodate( a.symbol, _raw_occupied_valency( a) + increase, a.charge):
+        return False
+    return True
+
+
+
   def toggle_type( self, only_shift = 0, to_type='n', to_order=1, simple_double=1):
     # just simply use the simple_double value
     self.simple_double = simple_double
     if not only_shift:
+      # refuse an order increase that either end atom cannot accommodate:
+      # the s=>d=>t cycle below already refuses it, but clicking with an
+      # explicit double/triple tool went through switch_to_order()
+      # unchecked and only left a "maximum valency exceeded!" warning
+      if to_order > self.order and not self._order_increase_fits( to_order):
+        Store.log( _("Can not raise bond order: the combined atom would exceed the maximum valency"), message_type="error")
+        return
       if to_type != self.type:
         # if type was changed simply apply the change
         self.switch_to_type( to_type)

@@ -36,7 +36,7 @@ import copy
 from . import helper_graphics as hg
 from .parents import container, top_level, id_enabled, with_paper
 from .bond import bond
-from .atom import atom
+from .atom import atom, _valency_can_accommodate, _raw_occupied_valency
 from .group import group
 from .textatom import textatom
 from .queryatom import queryatom
@@ -427,20 +427,36 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
 
   def handle_overlap( self):
     "deletes one of overlaping atoms and updates the bonds"
-    to_delete = []
-    bonds_to_check = set() # this can speedup the following for b in bonds_to_check by factor of 10 for big mols
+    self.overlap_refusals = []
+    # collect the overlapping pairs first, in the historical order;
+    # an atom already claimed as the vanishing half of an earlier
+    # pair cannot be the survivor of another one
+    pairs = []
+    claimed = set()
     for i in range( len( self.atoms)):
       for j in range( i+1, len( self.atoms)):
         a = self.atoms[i]
         b = self.atoms[j]
         if (abs( a.x-b.x) < 4) and (abs( a.y-b.y) <4):
-          if a not in to_delete:
-            for e,v in b.get_neighbor_edge_pairs():
-              e.change_atoms( b, a)
-              a.add_neighbor( v, e)
-              v.add_neighbor( a, e)
-              bonds_to_check.add( e)
-            to_delete.append( b)
+          if a not in claimed:
+            pairs.append( (a, b))
+            claimed.add( b)
+    # refuse clusters of pairs whose resulting atoms would exceed
+    # their valency (see overlap_refused_pairs); refused pairs are
+    # left untouched and reported by the caller (paper)
+    refused = overlap_refused_pairs( pairs)
+    self.overlap_refusals = [p for p in pairs if p in refused]
+    to_delete = []
+    bonds_to_check = set() # this can speedup the following for b in bonds_to_check by factor of 10 for big mols
+    for a, b in pairs:
+      if (a, b) in refused:
+        continue
+      for e,v in b.get_neighbor_edge_pairs():
+        e.change_atoms( b, a)
+        a.add_neighbor( v, e)
+        v.add_neighbor( a, e)
+        bonds_to_check.add( e)
+      to_delete.append( b)
     deleted = misc.filter_unique( to_delete)
     [self.delete_atom( o) for o in deleted]
     # after all is done, find and delete orphan bonds and update the others
@@ -448,7 +464,6 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
     bonds = set( self.bonds)
     for b in bonds_to_check:
       if not b in self.bonds:
-        #print b, "not in self.bonds"
         continue
       recent_b = None
       for recent_b in self.gen_bonds_between( b.atom1, b.atom2):
@@ -642,7 +657,7 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
       v = self.create_vertex( vertex_class=textatom)
       v.set_name( text)
       return v
-    val = old and old.occupied_valency or 0
+    val = _raw_occupied_valency( old) if old else 0
     # if it seems like a known group, try it first
     if val==1 and group.is_known_group( text):
       v = self.create_vertex( vertex_class=group)
@@ -762,3 +777,82 @@ class molecule( container, top_level, id_enabled, oasa.molecule, with_paper):
       self.t_atom = v
     else:
       raise ValueError("submitted atom does not belong to this molecule")
+
+
+def overlap_refused_pairs( pairs):
+  """the subset of `pairs` (a, b) - a survives, b is unified into
+  a - that must not be unified because some surviving atom would
+  end up over its valency. Pairs are judged in connected clusters
+  (pairs linked by shared atoms or by bonds between paired atoms,
+  as when two rings are fused along a bond): the prospective
+  occupied valency of each surviving atom is computed on the
+  structure that would result, and either the whole cluster fits
+  or the whole cluster is refused, so a fusion never happens
+  half-way. Bonds that would end up parallel between the same two
+  atoms collapse to the one bond handle_overlap keeps (the bond
+  already attached to the surviving atom, else the largest).
+  Pairs involving groups, text atoms, query atoms or other
+  non-element vertices as the survivor are not checked and keep
+  the historical behaviour."""
+  pairs = [tuple( p) for p in pairs]
+  if not pairs:
+    return set()
+  root_of = {}
+  for a, b in pairs:
+    root_of[ b] = a
+  def root( x):
+    seen = set()
+    while x in root_of and x not in seen:
+      seen.add( x)
+      x = root_of[ x]
+    return x
+  paired = set()
+  for a, b in pairs:
+    paired.add( a)
+    paired.add( b)
+  parent = dict( (x, x) for x in paired)
+  def find( x):
+    while parent[ x] != x:
+      parent[ x] = parent[ parent[ x]]
+      x = parent[ x]
+    return x
+  def union( x, y):
+    rx, ry = find( x), find( y)
+    if rx != ry:
+      parent[ ry] = rx
+  for a, b in pairs:
+    union( a, b)
+  for x in paired:
+    for e, v in x.get_neighbor_edge_pairs():
+      if v in paired:
+        union( x, v)
+  clusters = {}
+  for p in pairs:
+    clusters.setdefault( find( p[0]), []).append( p)
+  refused = set()
+  for cpairs in clusters.values():
+    members = {}
+    for a, b in cpairs:
+      for x in (a, b):
+        members.setdefault( root( x), set()).add( x)
+    fits = True
+    for r, mem in members.items():
+      if not isinstance( r, atom) or r.symbol not in PT.periodic_table:
+        continue
+      groups = {}
+      for x in mem:
+        for e, v in x.get_neighbor_edge_pairs():
+          rv = root( v)
+          if rv is r:
+            continue
+          groups.setdefault( rv, []).append( (x, e))
+      occ = getattr( r, 'explicit_hydrogens', 0)
+      for rv, bonds in groups.items():
+        own = [e.order for (x, e) in bonds if x is r]
+        occ += own[0] if own else max( e.order for (x, e) in bonds)
+      if not _valency_can_accommodate( r.symbol, occ, r.charge):
+        fits = False
+        break
+    if not fits:
+      refused.update( cpairs)
+  return refused

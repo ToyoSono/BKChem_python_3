@@ -49,7 +49,8 @@ from . import helper_graphics as hg
 from . import dom_extensions
 from . import messages
 from .bond import bond
-from .atom import atom
+from .atom import atom, _valency_can_accommodate, _raw_occupied_valency
+from .oasa import periodic_table as PT
 from .group import group
 from .textatom import textatom
 from .context_menu import context_menu
@@ -72,6 +73,26 @@ from .singleton_store import Store, Screen
 
 
 ## -------------------- PARENT MODES--------------------
+
+def _atom_can_take_bond( a, order):
+  """True if atom a can accept one more bond of the given order
+  without exceeding its valency. Non-element vertices (groups, text
+  atoms, query atoms) are not checked and keep the historical
+  behaviour, mirroring the other valency guards."""
+  if not isinstance( a, atom):
+    return True
+  if a.symbol not in PT.periodic_table:
+    return True
+  return _valency_can_accommodate( a.symbol, _raw_occupied_valency( a) + order, a.charge)
+
+
+def _log_cannot_add_bond():
+  Store.log( _("Can not add bond: the atom would exceed the maximum valency"), message_type="error")
+
+
+def _log_cannot_add_template():
+  Store.log( _("Can not add template: the atom would exceed the maximum valency"), message_type="error")
+
 
 class mode( object):
   """abstract parent for all modes. No to be used for inheritation because the more specialized
@@ -732,6 +753,9 @@ class edit_mode( basic_mode):
     if not self.focused:
       return
     a = self.focused
+    if not _atom_can_take_bond( a, 1):
+      _log_cannot_add_bond()
+      return
     mol = a.molecule
     for i in range( n):
       a, b = mol.add_atom_to( a)
@@ -783,6 +807,24 @@ class draw_mode( edit_mode):
       if self._moved_atom:
         Store.app.paper.select( [self._moved_atom])
       deleted, preserved = Store.app.paper.handle_overlap() # should be done before repositioning for ring closure to take effect
+      # if the bond drawn by this drag pushed the start atom over its
+      # valency, take that bond back out (and the atom created for the
+      # drag with it, when it is still a separate atom) and say so;
+      # a start atom that was already over its valency before the
+      # drag is left to the warning below
+      sa = self._start_atom
+      db = getattr( self, '_bonds_to_update', None)
+      if sa is not None and db is not None and isinstance( sa, atom) \
+         and sa.symbol in PT.periodic_table and db in sa.get_neighbor_edges() \
+         and not _valency_can_accommodate( sa.symbol, _raw_occupied_valency( sa), sa.charge) \
+         and _valency_can_accommodate( sa.symbol, _raw_occupied_valency( sa) - db.order, sa.charge):
+        ma = self._moved_atom
+        mol = sa.molecule
+        mol.delete_bond( db)
+        if ma is not None and ma in mol.atoms and not ma.neighbors:
+          mol.delete_atom( ma)
+          Store.app.paper.unselect_all()
+        _log_cannot_add_bond()
       # repositioning of double bonds
 
       for vrx in preserved + [self._start_atom]:
@@ -833,30 +875,36 @@ class draw_mode( edit_mode):
                   type=self.__mode_to_bond_type(),
                   order=self.__mode_to_bond_order(),
                   simple_double=self.submode[4])
-        a, b = self.focused.molecule.add_atom_to( self.focused, bond_to_use=b)
-        # update atom text
-        if hasattr( self.focused, 'update_after_valency_change'):
-          self.focused.update_after_valency_change()
-          self.reposition_bonds_around_atom(self.focused)
-        # warn when valency is exceeded
-        if self.focused.free_valency < 0:
-          Store.log( _("maximum valency exceeded!"), message_type="warning")
-        # adding more than one bond to group
-        if isinstance( self.focused, group):
-          # we need to change the class of the vertex
-          a = self.focused
-          m = a.molecule
-          v = m.create_vertex_according_to_text( None, a.xml_ftext, interpret=0)
-          a.copy_settings( v)
-          a.molecule.replace_vertices( a, v)
-          a.delete()
-          v.draw()
-          v.focus()
-          self.focused = v
-          Store.log( _("Groups could have valency of 1 only! It was transformed to text!"), message_type="warning")
-        # repositioning of double bonds
-        self.reposition_bonds_around_bond( b)
-        Store.app.paper.select( [a])
+        if not _atom_can_take_bond( self.focused, b.order):
+          # refuse to draw a bond that would exceed the atom's valency
+          _log_cannot_add_bond()
+          a = None
+        else:
+          a, b = self.focused.molecule.add_atom_to( self.focused, bond_to_use=b)
+        if a is not None:
+          # update atom text
+          if hasattr( self.focused, 'update_after_valency_change'):
+            self.focused.update_after_valency_change()
+            self.reposition_bonds_around_atom(self.focused)
+          # warn when valency is exceeded
+          if self.focused.free_valency < 0:
+            Store.log( _("maximum valency exceeded!"), message_type="warning")
+          # adding more than one bond to group
+          if isinstance( self.focused, group):
+            # we need to change the class of the vertex
+            a = self.focused
+            m = a.molecule
+            v = m.create_vertex_according_to_text( None, a.xml_ftext, interpret=0)
+            a.copy_settings( v)
+            a.molecule.replace_vertices( a, v)
+            a.delete()
+            v.draw()
+            v.focus()
+            self.focused = v
+            Store.log( _("Groups could have valency of 1 only! It was transformed to text!"), message_type="warning")
+          # repositioning of double bonds
+          self.reposition_bonds_around_bond( b)
+          Store.app.paper.select( [a])
       elif isinstance( self.focused, bond):
         if self._shift:
           self.focused.toggle_type( only_shift = 1, to_type=self.__mode_to_bond_type(),
@@ -1151,6 +1199,8 @@ class template_mode( edit_mode):
           Store.log( _("Sorry, it is not possible to append a template to an atom with non-zero Z coordinate, yet."),
                         message_type="hint")
           return
+        if not self._template_fits_focused_atom():
+          return
         if self.focused.free_valency >= self._get_templates_valency():
           x1, y1 = self.focused.neighbors[0].get_xy()
           x2, y2 = self.focused.get_xy()
@@ -1160,6 +1210,8 @@ class template_mode( edit_mode):
           x2, y2 = self.focused.molecule.find_place( self.focused, Screen.any_to_px( Store.app.paper.standard.bond_length))
           t = self._get_transformed_template( self.submode[0], (x1,y1,x2,y2), type='atom2', paper=Store.app.paper)
       elif isinstance( self.focused, bond):
+        if not self._template_fits_focused_bond():
+          return
         x1, y1 = self.focused.atom1.get_xy()
         x2, y2 = self.focused.atom2.get_xy()
         #find right side of bond to append template to
@@ -1212,6 +1264,68 @@ class template_mode( edit_mode):
 
   def _get_templates_valency( self):
     return self.template_manager.get_templates_valency( self.submode[0])
+
+  def _template_fits_focused_atom( self):
+    """True if appending the selected template to the focused atom keeps
+    it within valency (checked before anything is drawn, so a refusal
+    leaves nothing behind). Groups, text atoms and query atoms are not
+    checked, mirroring the other valency guards. Appending takes the
+    'atom1' path when the atom has room for the template's own bonds
+    (the template's attachment atom merges in, adding that many bonds)
+    and the 'atom2' path otherwise (a single new bond joins the atom
+    to the template). Occupancy is the raw bond-order sum, as in the
+    other guards, so charged atoms are judged correctly."""
+    a = self.focused
+    if not isinstance( a, atom) or a.symbol not in PT.periodic_table:
+      return True
+    if a.free_valency >= self._get_templates_valency():
+      added = self._get_templates_valency()
+    else:
+      added = 1
+    if _valency_can_accommodate( a.symbol, _raw_occupied_valency( a) + added, a.charge):
+      return True
+    _log_cannot_add_template()
+    return False
+
+  def _template_fits_focused_bond( self):
+    """True if fusing the selected template onto the focused bond keeps
+    both of its atoms within valency. Each endpoint gains the template
+    bond atom's other bonds; the bond between the two template atoms
+    duplicates the focused bond and is removed again when the atoms
+    unify, so it adds nothing. The same holds for a template bond
+    atom's bond to the template's t_atom (cyclopentane, cycloheptane
+    and cyclooctane mark next_to_t_atom as a bond atom): bond-type
+    placement deletes t_atom first, so that bond adds nothing either.
+    When the template data is unavailable (or the template cannot be
+    added to a bond at all) the check is skipped and the historical
+    behaviour is kept."""
+    a1, a2 = self.focused.atom1, self.focused.atom2
+    try:
+      prep = self.template_manager._prepared_templates[ self.submode[0]]
+      t1, t2 = prep.t_bond_first, prep.t_bond_second
+    except (AttributeError, IndexError, TypeError):
+      return True
+    if t1 is None or t2 is None:
+      return True
+    tb = None
+    for b in prep.gen_bonds_between( t1, t2):
+      tb = b
+      break
+    if tb is None:
+      return True
+    for endpoint, tatom in ( (a1, t1), (a2, t2)):
+      if isinstance( endpoint, atom) and endpoint.symbol in PT.periodic_table:
+        added = _raw_occupied_valency( tatom) - tb.order
+        # the t_atom bond vanishes with t_atom in bond-type placement
+        ta = prep.t_atom
+        if ta is not None:
+          to_ta = prep.bond_between( tatom, ta)
+          if to_ta is not None:
+            added -= to_ta.order
+        if not _valency_can_accommodate( endpoint.symbol, _raw_occupied_valency( endpoint) + added, endpoint.charge):
+          _log_cannot_add_template()
+          return False
+    return True
 
 
 
@@ -2300,21 +2414,41 @@ class rapid_draw_mode( edit_mode):
         self._start_atom = self.molecule.create_new_atom( event.x, event.y)
       else:
         x, y = self._get_xy_according_to_submodes( event)
-        self._start_atom, b = self.molecule.add_atom_to( self._start_atom, bond_to_use=self.get_edge( self.molecule, modifiers), pos=(x, y))
+        e = self.get_edge( self.molecule, modifiers)
+        # the atom the new bond would land on, if any (the same
+        # position search add_atom_to performs)
+        target = None
+        for at in self.molecule.atoms:
+          if abs( at.x - x) < 2 and abs( at.y - y) < 2 and at != self._start_atom:
+            target = at
+            break
+        if not _atom_can_take_bond( self._start_atom, e.order) or \
+           (target is not None and not _atom_can_take_bond( target, e.order)):
+          _log_cannot_add_bond()
+          return
+        self._start_atom, b = self.molecule.add_atom_to( self._start_atom, bond_to_use=e, pos=(x, y))
     elif isinstance( self.focused, oasa.graph.vertex):
       if self.molecule and self.focused != self._start_atom:
         if self.focused.molecule == self.molecule:
           if not self._start_atom in self.focused.neighbors:
-            e = self.molecule.add_edge( self._start_atom, self.focused, e=self.get_edge( self.molecule, modifiers))
+            e = self.get_edge( self.molecule, modifiers)
+            if not _atom_can_take_bond( self._start_atom, e.order) or not _atom_can_take_bond( self.focused, e.order):
+              _log_cannot_add_bond()
+              return
+            e = self.molecule.add_edge( self._start_atom, self.focused, e=e)
             e.draw()
             self._start_atom = self.focused
           else:
             self._start_atom = self.focused
         else:
+          e = self.get_edge( self.molecule, modifiers)
+          if not _atom_can_take_bond( self._start_atom, e.order) or not _atom_can_take_bond( self.focused, e.order):
+            _log_cannot_add_bond()
+            return
           mol = self.focused.molecule
           self.molecule.eat_molecule( self.focused.molecule)
           Store.app.paper.stack.remove( mol)
-          e = self.molecule.add_edge( self.focused, self._start_atom, e=self.get_edge( self.molecule, modifiers))
+          e = self.molecule.add_edge( self.focused, self._start_atom, e=e)
           e.draw()
           self._start_atom = self.focused
       elif not self.molecule:

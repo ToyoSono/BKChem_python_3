@@ -278,7 +278,7 @@ class atom( drawable_chem_vertex, oasa.atom):
         # impossible value instead (e.g. an oxygen with 3 bonds, or a
         # hydrogen inside a ring)
         if occupied_valency == None:
-          occ = self.occupied_valency
+          occ = _raw_occupied_valency( self)
         else:
           occ = occupied_valency
         if not _valency_can_accommodate( elch[0], occ, self.charge + elch[1]):
@@ -629,6 +629,16 @@ class atom( drawable_chem_vertex, oasa.atom):
   def after_undo( self):
     """this is run after undo"""
     self._clean_cache()
+
+
+def _raw_occupied_valency( a):
+  """the sum of the bond orders attached to atom a, plus its explicit
+  hydrogens - the `occupied` _valency_can_accommodate expects. oasa's
+  occupied_valency property must not be passed there instead: it
+  already folds the charge correction in, so the correction would be
+  applied twice for charged atoms (an oxonium oxygen or an ammonium
+  nitrogen would be allowed one bond too many)."""
+  return sum( e.order for e, v in a.get_neighbor_edge_pairs()) + getattr( a, 'explicit_hydrogens', 0)
 
 
 def _valency_can_accommodate( symbol, occupied, charge):

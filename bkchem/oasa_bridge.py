@@ -1175,6 +1175,35 @@ def oasa_atom_to_bkchem_atom( a, paper, m):
   at.show_number = False
   at.isotope = a.isotope
   at.valency = a.valency
+  # oasa raises the valency of an atom past every valency listed
+  # for its element when the input insists on an explicit hydrogen
+  # the atom cannot actually carry - e.g. the [OH+] spelling of
+  # benzopyrylium (bond order sum 3) is parsed with valency 3.
+  # BKChem does not carry the explicit hydrogen, so copied
+  # verbatim the atom would end up overvalent here (free_valency
+  # -1) although the same atom drawn by hand is fine. Use the
+  # smallest listed valency that accommodates the bonds the atom
+  # actually has instead; when none does, the source really is
+  # overvalent and the copied value is kept, so the problem
+  # stays visible.
+  from .oasa import periodic_table as PT
+  listed = PT.periodic_table.get( a.symbol, {}).get( 'valency', [])
+  if listed and at.valency not in listed:
+    bond_sum = sum( e.order for e, v in a.get_neighbor_edge_pairs())
+    for v in sorted( listed):
+      if not a.charge:
+        correction = 0
+      elif abs( a.charge) > 1:
+        correction = abs( a.charge)
+      elif a.charge == 1 and a.symbol in PT.accept_cation and v <= PT.accept_cation[ a.symbol]:
+        correction = -1
+      elif a.charge == -1 and a.symbol in PT.accept_anion and v <= PT.accept_anion[ a.symbol]:
+        correction = -1
+      else:
+        correction = abs( a.charge)
+      if bond_sum + correction <= v:
+        at.valency = v
+        break
   at.multiplicity = at.multiplicity
   return at
 

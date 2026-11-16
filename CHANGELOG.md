@@ -4,6 +4,15 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 13 — 2026-11-17
+
+### Fixed
+
+- **Valency violations are now refused with an error instead of being silently accepted**: four operations could push an atom past its maximum valency with no error (at most an after-the-fact warning, and in one case a half-finished fusion). Unifying atoms by dragging is now judged per connected cluster of overlapping atoms, so a fusion either fully fits or is fully refused and never happens half-way; raising a bond order, drawing a new bond, and placing or fusing a template are checked before anything changes and refuse with an error, leaving the drawing unchanged. Charged atoms are counted by their actual bond-order sum, so legitimate structures still work: an oxonium O+ keeps three bonds (anthocyanin / flavylium), and NH4+ takes exactly three added bonds. Verified on Windows. (`bkchem/atom.py`, `bkchem/bond.py`, `bkchem/modes.py`, `bkchem/molecule.py`, `bkchem/paper.py`)
+- **Oxonium structures read from SMILES no longer arrive with a negative free valency**: for the [OH+] spelling of e.g. flavylium, oasa raises the oxygen's valency to a value BKChem cannot use, leaving free valency -1; the imported atom now takes the smallest listed valency that fits its actual bonds. (`bkchem/oasa_bridge.py`)
+- **Aromatic SMILES with a pyrylium oxygen now draws correctly on the built-in (oasa) reading path**: cyanidin's [o+] oxygen was depicted as "OH+" with two single bonds, because the aromatic-bond localization scored the charged oxygen as unable to take a double bond and fell back to a fake localization; the oxygen now gets its three bonds, matching the OpenBabel path. (`bkchem/oasa/oasa/atom.py`)
+- **The experimental http_server modules now import under Python 3**: `bkchem/http_server.py` and `bkchem/http_server2.py` still contained Python 2 code and could not be imported at all. They are not used by the application; the fix only makes the files loadable again, in line with this fork's keep-and-fix policy for unused code.
+
 ## Fork release 12 — 2026-11-15
 
 ### Added / Changed

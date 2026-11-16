@@ -26,7 +26,7 @@ import tkinter.font as tkFont
 import tkinter.messagebox as tkMessageBox
 from . import classes
 from . import arrow
-from .molecule import molecule
+from .molecule import molecule, overlap_refused_pairs
 from functools import reduce
 try:
   from .oasa.oasa.transform import transform 
@@ -842,6 +842,16 @@ class chem_paper( Canvas, object):
             if (not [a2,a1] in overlap) and a1.z == a2.z:
               overlap.append( [a1,a2])
 
+    # pairs whose unification would exceed the surviving atom's
+    # valency are refused up front: they neither merge nor join
+    # their molecules; the refusal is reported below, together with
+    # any refusal molecule.handle_overlap records itself
+    paper_refusals = []
+    if overlap:
+      refused = overlap_refused_pairs( overlap)
+      paper_refusals = [tuple( p) for p in overlap if tuple( p) in refused]
+      overlap = [p for p in overlap if tuple( p) not in refused]
+
     deleted = []
     if overlap:
       mols = misc.filter_unique( map( lambda a: map( lambda b: b.molecule, a), overlap))
@@ -865,6 +875,17 @@ class chem_paper( Canvas, object):
       self.selected = misc.difference( self.selected, deleted)
       self.add_bindings()
       Store.log( _('concatenated overlaping atoms'))
+
+    # report atom pairs whose unification was refused in
+    # molecule.handle_overlap because the combined atom would have
+    # exceeded the surviving atom's valency; those atoms were left
+    # unmerged, so say so instead of silently keeping the violation
+    refusals = list( paper_refusals)
+    for mol in self.molecules:
+      refusals.extend( getattr( mol, 'overlap_refusals', []))
+      mol.overlap_refusals = []
+    if refusals:
+      Store.log( _('Can not unify: the combined atom would exceed the maximum valency'), message_type="error")
 
     preserved = []
     for a, b in overlap:
