@@ -1,3 +1,4 @@
+<a href="https://alternativeto.net/software/bkchem-python-3-fork/about/?utm_source=badge&utm_medium=referral" target="_blank"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="BKChem (Python 3 fork) | AlternativeTo" width="244" height="79" style="width: 244px; height: 79px;" /></a>
 # BKChem (Python 3 Modernized)
 
 **BKChem** is a free (open source) 2D molecular drawing program. It was originally developed by Beda Kosata and has been a staple in the open-source chemical informatics community for years.

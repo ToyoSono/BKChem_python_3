@@ -1,3 +1,4 @@
+<a href="https://alternativeto.net/software/bkchem-python-3-fork/about/?utm_source=badge&utm_medium=referral" target="_blank"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="BKChem (Python 3 fork) | AlternativeTo" width="244" height="79" style="width: 244px; height: 79px;" /></a>
 # BKChem（Python 3 対応版）
 
 **BKChem** はフリー（オープンソース）の 2D 分子描画プログラムです。もともと Beda Kosata によって開発され、長年にわたりオープンソースのケムインフォマティクス界で使われてきました。
