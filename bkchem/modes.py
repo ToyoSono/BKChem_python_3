@@ -1231,6 +1231,25 @@ class template_mode( edit_mode):
     #                              Store.tm.get_template_names()[ self.submode[0]].encode('utf-8'))
     Store.app.paper.select( [o for o in t])
     Store.app.paper.handle_overlap()
+    # Atoms that gained bonds from the template step up to the next
+    # senseful valency, as they do when a bond is drawn by hand (the
+    # draw modes call update_after_valency_change on the atoms they
+    # connect).  Without this the atom kept its old valency, so the
+    # check below warned "maximum valency exceeded!" even for states
+    # BKChem accepts on those other paths - a thiophene sulfur that
+    # gains one bond, for instance, steps from valency 2 to 4 and
+    # keeps a lone pair.  Atoms whose valency cannot step up far
+    # enough stay over the limit and are still warned about below.
+    if self.focused:
+      if isinstance( self.focused, bond):
+        _loaded_atoms = ( self.focused.atom1, self.focused.atom2)
+      elif isinstance( self.focused, oasa.graph.vertex):
+        _loaded_atoms = ( self.focused,)
+      else:
+        _loaded_atoms = ()
+      for _a in _loaded_atoms:
+        if hasattr( _a, 'update_after_valency_change') and _a in _a.molecule.atoms:
+          _a.update_after_valency_change()
     # checking of valency
     if self.focused:
       if isinstance( self.focused, bond) and (self.focused.atom1.free_valency < 0 or self.focused.atom2.free_valency < 0):

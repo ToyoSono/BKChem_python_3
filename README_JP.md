@@ -14,6 +14,7 @@
 | OS | アーカイブファイル名 | 注意点 |
 |---|---|---|
 | Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono が自機で起動とimport / export を確認しました。コード署名がないため、初回起動時に Windows SmartScreen の警告が出ることがあります。「詳細情報」→「実行」の順にクリックすると起動できます|
+| Windows (amd64) | **`BKChem-portable-w-ob-inch.zip`** |上記 Windows 版に OpenBabel 3.1.1 と inch-1.exe を同梱したアーカイブです。ご利用の際は、実行ファイルと3つのフォルダを同じ場所に置いてください|
 | Linux |  **`BKChem-portable-linux.tar.gz`** |Ubuntu 22.04 でビルドしており、それ以降のバージョンの OS で動作させるのを推奨します。X11 環境で利用しているなら xclip を、Wayland 環境で利用しているなら wl-clipboard をインストールしてください。実機での動作は未確認です|
 |macOS （Arm 版） | **`BKChem-portable-macos.tar.gz`**|実機での動作は未確認です。未署名のため初回は右クリック→開く が必要になります。|
 

@@ -4,6 +4,22 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 
 日本語版は [CHANGELOG_JP.md](CHANGELOG_JP.md) を見てください。
 
+## Fork release 14 — 2026-11-22
+
+### Added
+
+- **OpenBabel and the InChI program can now be bundled with the portable build**: when an `openbabel` folder (a copy of the installed OpenBabel 3.1.1 program folder, about 14.5 MB including its `data` folder) and an `inchi` folder containing `inchi-1.exe` sit beside `BKChem.exe` (or beside `start_bkchem.py` in a source copy), Read SMILES / Read InChI use the bundled OpenBabel and Generate InChI uses the bundled inchi-1, with no path settings needed. The resolution order is the configured program path (when the file exists), then the bundled copy, then the built-in oasa path; the Generate InChI menu is also enabled when a bundled inchi-1 exists. Verified on Windows, including a PyInstaller build with both folders beside the executable. (`bkchem/oasa_bridge.py`, `bkchem/main.py`)
+
+### Fixed
+
+- **Generate SMILES now works for salts**: a salt read through OpenBabel arrives as one molecule with disconnected components, and the SMILES writer failed on it with "Cannot encode disconnected compounds"; the components are now written separately and joined with ".". The stereochemistry of a chiral component is preserved (verified with sodium (S)-lactate), and the result was verified on Windows with Brilliant Blue FCF. (`bkchem/oasa_bridge.py`)
+- **Imported atoms no longer look overvalent when their listed valency is too small for their bonds**: a sulfonate sulfur arrived with valency 2 against a bond-order sum of 6, so it was drawn with a spurious hydrogen ("SH") and structure generation opened with a valency warning; the import now steps such an atom up to the smallest listed valency that fits its actual bonds (sulfonate S to 6, phosphate P to 5), using the same charge correction as the existing step-up for unlisted valencies. Verified on Windows with Brilliant Blue FCF, whose sulfurs now draw as plain "S". (`bkchem/oasa_bridge.py`)
+- **A neutral nitrogen can no longer take a fourth bond through the valency guards**: the shared check accepted a bond-order sum of 4 for nitrogen via its listed valency 5, which is only physical together with a +1 charge (nitro, pyridinium, ammonium, amine oxides); listed valencies above 3 are now skipped for nitrogen in the shared guard, closing the hole in template placement, bond drawing, bond-order raising, drag unification and group substitution at once. To add a fourth bond to an amine or pyridine nitrogen, set the + charge first, then the bond is allowed. Verified on Windows. (`bkchem/atom.py`)
+
+### Added / Changed
+
+- **Template placement now steps the atom's valency up, like the drawing tools do**: placing a template on thiophene S, selenophene Se, chlorobenzene Cl, bromobenzene Br or triphenylphosphine / triphenylarsine P / As attached with only the legacy "maximum valency exceeded" warning and a negative free valency, because the placement path never raised the atom's valency the way the drawing paths do; the focused atom (or both ends of the focused bond) is now stepped up after placement (S / Se 2 to 4, Cl / Br 1 to 3, P / As 3 to 5) and attaches with no warning, while pyridine N and furan O are still refused with an error. Verified on Windows. (`bkchem/modes.py`)
+
 ## Fork release 13 — 2026-11-17
 
 ### Fixed

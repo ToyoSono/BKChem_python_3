@@ -14,6 +14,7 @@ A portable version that requires **no** Python installation is provided. Please 
 | OS | Archive File Name | Notes |
 |---|---|---|
 | Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono has verified that it launches and performs import/export operations on his own machine. Since the file is not digitally signed, a Windows SmartScreen warning may appear upon first launch. Click “More info” → “Run anyway” to launch the program.|
+| Windows (amd64) | **`BKChem-portable-w-ob-inch.zip`** |This archive includes the Windows version mentioned above, along with OpenBabel 3.1.1 and inch-1.exe. Please place the executable file and the three folders in the same location while using them.|
 | Linux |  **`BKChem-portable-linux.tar.gz`** | Built on Ubuntu 22.04; running it on later versions of the OS is recommended. If you are using an X11 environment, please install xclip; if you are using a Wayland environment, please install wl-clipboard. Operation on actual hardware has not been verified.|
 | macOS (Arm version) | **`BKChem-portable-macos.tar.gz`** | Operation on physical devices has not been verified. Since the file is unsigned, you’ll need to right-click and select “Open” the first time you run it.|
 

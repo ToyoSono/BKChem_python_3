@@ -649,6 +649,17 @@ def _valency_can_accommodate( symbol, occupied, charge):
   raises the usable valency by one (e.g. oxonium O+ with 3 bonds,
   ammonium N+ with 4), any other charge reduces it."""
   for v in PT.periodic_table[ symbol]['valency']:
+    if symbol == 'N' and v > 3:
+      # Nitrogen is a second-period element and cannot exceed the
+      # octet: its listed valency of 5 is only ever realised together
+      # with a +1 charge at a bond-order sum of 4 (nitro, pyridinium,
+      # ammonium, amine oxides), which the valency-3 entry plus the
+      # charge correction below already accommodates.  Judged against
+      # the 5 instead, a neutral nitrogen at a bond-order sum of 4 or
+      # 5 passes here while the atom itself (valency 3) ends up with
+      # a negative free valency - the guards would let through exactly
+      # what BKChem then warns about as "maximum valency exceeded!".
+      continue
     if not charge:
       correction = 0
     elif abs( charge) > 1:

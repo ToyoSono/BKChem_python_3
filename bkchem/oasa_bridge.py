@@ -32,6 +32,7 @@ import math
 import operator
 import os
 import subprocess
+import sys
 import tempfile
 
 from .singleton_store import Screen
@@ -482,6 +483,80 @@ def _pick_best_layout( make_mol, tries):
   return best
 
 
+def _bundled_search_bases():
+  """Folders that may hold bundled helper programs: the portable
+  executable's folder when frozen, then the folder holding the
+  bkchem package (the top of the source tree, or _internal in a
+  frozen build), then that folder's parent (the portable root as
+  seen from inside _internal)."""
+  pkg_dir = os.path.dirname( os.path.abspath( __file__))
+  bases = []
+  if getattr( sys, "frozen", False):
+    bases.append( os.path.dirname( os.path.abspath( sys.executable)))
+  bases.append( os.path.dirname( pkg_dir))
+  bases.append( os.path.dirname( os.path.dirname( pkg_dir)))
+  seen = set()
+  unique = []
+  for base in bases:
+    if base not in seen:
+      seen.add( base)
+      unique.append( base)
+  return unique
+
+
+
+def _find_bundled_openbabel():
+  """Return the path of an OpenBabel program bundled with BKChem -
+  an "openbabel" folder placed next to the portable executable, or
+  at the top of the source tree when running from source - or None
+  when no bundled copy is present. A configured program path always
+  wins over the bundled copy (see _resolve_openbabel_program)."""
+  exe_name = "obabel.exe" if os.name == "nt" else "obabel"
+  for base in _bundled_search_bases():
+    candidate = os.path.join( base, "openbabel", exe_name)
+    if os.path.isfile( candidate):
+      return candidate
+  return None
+
+
+
+def _resolve_openbabel_program( program):
+  """The program to use for OpenBabel reads: the configured path
+  when it names an existing file, otherwise the bundled copy when
+  one is present, otherwise None (the caller then uses oasa)."""
+  if program and os.path.isfile( program):
+    return program
+  return _find_bundled_openbabel()
+
+
+
+def _find_bundled_inchi():
+  """Return the path of an InChI program (inchi-1) bundled with
+  BKChem - an "inchi" folder placed next to the portable
+  executable, or at the top of the source tree when running from
+  source - or None when no bundled copy is present. A configured
+  program path always wins over the bundled copy (see
+  _resolve_inchi_program)."""
+  exe_name = "inchi-1.exe" if os.name == "nt" else "inchi-1"
+  for base in _bundled_search_bases():
+    candidate = os.path.join( base, "inchi", exe_name)
+    if os.path.isfile( candidate):
+      return candidate
+  return None
+
+
+
+def _resolve_inchi_program( program):
+  """The program to use for Generate InChI: the configured path
+  when it names an existing file, otherwise the bundled copy when
+  one is present, otherwise None (oasa then falls back to its own
+  configured path, as before)."""
+  if program and os.path.isfile( program):
+    return program
+  return _find_bundled_inchi()
+
+
+
 def _read_via_openbabel( text, input_format, paper, program):
   """Read a SMILES or InChI string with the external OpenBabel
   program (obabel): the text goes to a temporary file, obabel
@@ -503,6 +578,15 @@ def _read_via_openbabel( text, input_format, paper, program):
       if os.name == "nt":
         # do not flash a console window from the GUI application
         kwargs["creationflags"] = getattr( subprocess, "CREATE_NO_WINDOW", 0)
+      # A portable OpenBabel copy carries its data files in a "data"
+      # folder next to the program; point BABEL_DATADIR at it for
+      # this call only. An installed copy has no such folder (its
+      # data lives elsewhere), so the system setup is left alone.
+      data_dir = os.path.join( os.path.dirname( os.path.abspath( program)), "data")
+      if os.path.isdir( data_dir):
+        env = dict( os.environ)
+        env["BABEL_DATADIR"] = data_dir
+        kwargs["env"] = env
       subprocess.run( [program, "-i" + input_format, fin,
                        "-omol", "--gen2d", "-O", fout],
                       capture_output=True, timeout=60, **kwargs)
@@ -524,8 +608,9 @@ def _read_via_openbabel( text, input_format, paper, program):
 
 
 def read_smiles( text, paper, openbabel_program=None):
-  if openbabel_program and os.path.isfile( openbabel_program):
-    m = _read_via_openbabel( text, "smi", paper, openbabel_program)
+  program = _resolve_openbabel_program( openbabel_program)
+  if program:
+    m = _read_via_openbabel( text, "smi", paper, program)
     if m is not None:
       return m
   def make_mol():
@@ -550,7 +635,16 @@ def mol_to_smiles( mol):
   m.remove_unimportant_hydrogens()
   _add_tetrahedral_stereochemistry_from_bonds( m)
   c = oasa.smiles.converter()
-  text = c.mols_to_text([m])
+  if m.is_connected():
+    text = c.mols_to_text([m])
+  else:
+    # The oasa SMILES writer cannot encode a disconnected structure
+    # (a salt, typically imported as one molecule with separate
+    # components) and raises "Cannot encode disconnected compounds"
+    # instead. Write each component on its own and let the
+    # converter join them with the molecule separator ("."), which
+    # is the standard SMILES spelling for salts.
+    text = c.mols_to_text( m.get_disconnected_subgraphs())
   return text
 
 
@@ -732,8 +826,9 @@ def _add_tetrahedral_stereochemistry_from_bonds( oasa_mol):
 
 
 def read_inchi( text, paper, openbabel_program=None):
-  if openbabel_program and os.path.isfile( openbabel_program):
-    m = _read_via_openbabel( text, "inchi", paper, openbabel_program)
+  program = _resolve_openbabel_program( openbabel_program)
+  if program:
+    m = _read_via_openbabel( text, "inchi", paper, program)
     if m is not None:
       return m
   def make_mol():
@@ -745,6 +840,7 @@ def read_inchi( text, paper, openbabel_program=None):
   return m
   
 def mol_to_inchi( mol, program):
+  program = _resolve_inchi_program( program)
   m = bkchem_mol_to_oasa_mol( mol)
   # we do not use mol_to_text because generate_inchi_and_inchikey returns extra warning messages
   _inchi, _key, _warnings = oasa.inchi.generate_inchi_and_inchikey( m, program=program, fixed_hs=False)
@@ -1188,9 +1284,9 @@ def oasa_atom_to_bkchem_atom( a, paper, m):
   # stays visible.
   from .oasa import periodic_table as PT
   listed = PT.periodic_table.get( a.symbol, {}).get( 'valency', [])
-  if listed and at.valency not in listed:
+  if listed:
     bond_sum = sum( e.order for e, v in a.get_neighbor_edge_pairs())
-    for v in sorted( listed):
+    def accommodates( v):
       if not a.charge:
         correction = 0
       elif abs( a.charge) > 1:
@@ -1201,9 +1297,21 @@ def oasa_atom_to_bkchem_atom( a, paper, m):
         correction = -1
       else:
         correction = abs( a.charge)
-      if bond_sum + correction <= v:
-        at.valency = v
-        break
+      return bond_sum + correction <= v
+    # Two shapes need the step-up to the smallest accommodating
+    # listed valency: the copied valency is not listed at all (the
+    # [OH+] case above), or it is listed but too small for the bonds
+    # the atom actually has - a sulfonate sulfur arrives with the
+    # default valency 2 while its bonds sum to 6, so it looked
+    # overvalent (free_valency -4) and was drawn with a spurious
+    # hydrogen. When no listed valency accommodates the bonds, the
+    # source really is overvalent and the copied value is kept, so
+    # the problem stays visible.
+    if at.valency not in listed or not accommodates( at.valency):
+      for v in sorted( listed):
+        if accommodates( v):
+          at.valency = v
+          break
   at.multiplicity = at.multiplicity
   return at
 

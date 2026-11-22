@@ -273,7 +273,7 @@ class BKChem( Tk):
       ( _("Chemistry"), 'separator'),
       ( _("Chemistry"), 'command', _('Generate SMILES'), None, _("Generate SMILES for the selected structure"), self.gen_smiles, 'selected_mols'),
       ( _("Chemistry"), 'command', _('Generate InChI'), None, _("Generate an InChI for the selected structure by calling the InChI program"), self.gen_inchi,
-        lambda : Store.pm.has_preference("inchi_program_path") and self.paper.selected_mols),
+        lambda : (Store.pm.has_preference("inchi_program_path") or oasa_bridge._find_bundled_inchi()) and self.paper.selected_mols),
       ( _("Chemistry"), 'separator'),
       #( _("Chemistry"), 'command', _('Set display form'), "(C-o C-d)",
       #  _("The display form is stored in the saved file and tells how the molecule should be displayed in text"),
