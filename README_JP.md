@@ -55,7 +55,7 @@ OS に依らない注意点: 実行ファイルは隣の `_internal` フォル�
 
 ## Generate InChI について
 
-Chemistry → Generate InChI は公式の InChI プログラムを外部実行する機能で、BKChem 本体には同梱されていません。[IUPAC-InChI の GitHub リリース](https://github.com/IUPAC-InChI/InChI/releases/latest)から InChI ソフトウェア（v1.07 以降、MIT ライセンス）をダウンロードしてください。`release_artifacts.zip` の中に `inchi-1.exe`（Windows)、`inchi-1`（Linux)、`inchi-1`（macOS）が入っています。自分の OS 用のプログラムを取り出し、BKChem の Options → InChI program path でそのファイルを指定すれば、構造式を選択したときに Generate InChI が使えるようになります。
+Chemistry → Generate InChI は公式の InChI プログラムを外部実行する機能で、BKChem 本体には同梱されていません。[IUPAC-InChI の GitHub リリース](https://github.com/IUPAC-InChI/InChI/releases/latest)から InChI ソフトウェア（v1.07 以降、MIT ライセンス）をダウンロードしてください。`release_artifacts.zip` の中に `inchi-1.exe`（Windows)、`inchi-1`（Linux)、`inchi-1`（macOS）が入っています。自分の OS 用のプログラムを取り出し、BKChem の Options → InChI program path でそのファイルを指定すれば、構造式を選択したときに Generate InChI が使えるようになります。なお、BKChem-portable-w-ob-inchi.zip では同梱済みのため、この設定は不要です。
 
 
 ## SMILES / InChI 読み込みと OpenBabel
