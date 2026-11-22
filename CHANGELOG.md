@@ -7,6 +7,7 @@ Changes made in **ToyoSono's fork** after forking [vijaymasand/BKChem_python_3](
 ## Fork release 14 — 2026-11-22
 
 ### Added
+- **OpenBabel / InChI can be bundled**: the `BKChem-portable-w-ob-inch.zip` archive includes `OpenBabel 3.1.1` and `inchi-1.exe`, so Read SMILES / Read InChI and Generate InChI work without installing anything.
 
 - **OpenBabel and the InChI program can now be bundled with the portable build**: when an `openbabel` folder (a copy of the installed OpenBabel 3.1.1 program folder, about 14.5 MB including its `data` folder) and an `inchi` folder containing `inchi-1.exe` sit beside `BKChem.exe` (or beside `start_bkchem.py` in a source copy), Read SMILES / Read InChI use the bundled OpenBabel and Generate InChI uses the bundled inchi-1, with no path settings needed. The resolution order is the configured program path (when the file exists), then the bundled copy, then the built-in oasa path; the Generate InChI menu is also enabled when a bundled inchi-1 exists. Verified on Windows, including a PyInstaller build with both folders beside the executable. (`bkchem/oasa_bridge.py`, `bkchem/main.py`)
 

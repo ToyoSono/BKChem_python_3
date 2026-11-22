@@ -14,7 +14,7 @@ A portable version that requires **no** Python installation is provided. Please 
 | OS | Archive File Name | Notes |
 |---|---|---|
 | Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono has verified that it launches and performs import/export operations on his own machine. Since the file is not digitally signed, a Windows SmartScreen warning may appear upon first launch. Click “More info” → “Run anyway” to launch the program.|
-| Windows (amd64) | **`BKChem-portable-w-ob-inch.zip`** |This archive includes the Windows version mentioned above, along with OpenBabel 3.1.1 and inch-1.exe. Please place the executable file and the three folders in the same location while using them.|
+| Windows (amd64) | **`BKChem-portable-w-ob-inchi.zip`** |This archive includes the Windows version mentioned above, along with OpenBabel 3.1.1 and inchi-1.exe. Please place the executable file and the three folders in the same location while using them.|
 | Linux |  **`BKChem-portable-linux.tar.gz`** | Built on Ubuntu 22.04; running it on later versions of the OS is recommended. If you are using an X11 environment, please install xclip; if you are using a Wayland environment, please install wl-clipboard. Operation on actual hardware has not been verified.|
 | macOS (Arm version) | **`BKChem-portable-macos.tar.gz`** | Operation on physical devices has not been verified. Since the file is unsigned, you’ll need to right-click and select “Open” the first time you run it.|
 
@@ -59,7 +59,7 @@ Chemistry → Generate InChI uses the official InChI program, which is not bundl
 
 ## OpenBabel for reading SMILES and InChI
 
-Chemistry → Read SMILES / Read InChI converts the entered string into a structure with BKChem's built-in reader. For structurally complex compounds, however, the resulting drawing can be strongly distorted, or the built-in reader may not be able to handle the input at all. If you run into trouble reading a compound from SMILES or InChI, linking BKChem with OpenBabel — a structure-file format converter — is recommended.
+Chemistry → Read SMILES / Read InChI converts the entered string into a structure with BKChem's built-in reader. For structurally complex compounds, however, the resulting drawing can be strongly distorted, or the built-in reader may not be able to handle the input at all. If you run into trouble reading a compound from SMILES or InChI, linking BKChem with OpenBabel — a structure-file format converter — is recommended. In the `BKChem-portable-w-ob-inchi.zip` archive, the program is already included, so no setup is needed.
 
 First, install OpenBabel. On Windows, download OpenBabel 3.1.1 from the [OpenBabel GitHub releases](https://github.com/openbabel/openbabel/releases/tag/openbabel-3-1-1) (`OpenBabel-3.1.1-x64.exe`, 38.7 MB) and install it. On other operating systems, install OpenBabel by the method appropriate for that OS.
 

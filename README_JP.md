@@ -14,7 +14,7 @@
 | OS | アーカイブファイル名 | 注意点 |
 |---|---|---|
 | Windows (amd64) | **`BKChem-portable.zip`** | ToyoSono が自機で起動とimport / export を確認しました。コード署名がないため、初回起動時に Windows SmartScreen の警告が出ることがあります。「詳細情報」→「実行」の順にクリックすると起動できます|
-| Windows (amd64) | **`BKChem-portable-w-ob-inch.zip`** |上記 Windows 版に OpenBabel 3.1.1 と inch-1.exe を同梱したアーカイブです。ご利用の際は、実行ファイルと3つのフォルダを同じ場所に置いてください|
+| Windows (amd64) | **`BKChem-portable-w-ob-inchi.zip`** |上記 Windows 版に OpenBabel 3.1.1 と inchi-1.exe を同梱したアーカイブです。ご利用の際は、実行ファイルと3つのフォルダを同じ場所に置いてください|
 | Linux |  **`BKChem-portable-linux.tar.gz`** |Ubuntu 22.04 でビルドしており、それ以降のバージョンの OS で動作させるのを推奨します。X11 環境で利用しているなら xclip を、Wayland 環境で利用しているなら wl-clipboard をインストールしてください。実機での動作は未確認です|
 |macOS （Arm 版） | **`BKChem-portable-macos.tar.gz`**|実機での動作は未確認です。未署名のため初回は右クリック→開く が必要になります。|
 
@@ -60,7 +60,7 @@ Chemistry → Generate InChI は公式の InChI プログラムを外部実行�
 
 ## SMILES / InChI 読み込みと OpenBabel
 
-Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 内部のプログラムで構造式に変換されます。しかし、構造が複雑な化合物の場合、得られる構造式の形状が大きく歪んだり、内部プログラムで処理しきれなくなります。自分が描きたい化合物を SMILES や InChI で読み込む際に不具合が生じるなら構造式ファイルの書式コンバーターである OpenBabel との連携をおすすめします。
+Chemistry → Read SMILES / Read InChI で読み込まれた文字列は BKChem 内部のプログラムで構造式に変換されます。しかし、構造が複雑な化合物の場合、得られる構造式の形状が大きく歪んだり、内部プログラムで処理しきれなくなります。自分が描きたい化合物を SMILES や InChI で読み込む際に不具合が生じるなら構造式ファイルの書式コンバーターである OpenBabel との連携をおすすめします。なお、`BKChem-portable-w-ob-inchi.zip` では同梱済みのため、この設定は不要です。
 
 まず OpenBabel をインストールしてください。Windows の場合は [OpenBabel の GitHub リリース](https://github.com/openbabel/openbabel/releases/tag/openbabel-3-1-1)から Windows 版 OpenBabel 3.1.1（`OpenBabel-3.1.1-x64.exe`、38.7 MB）をダウンロードしてインストールしてください。その他の OS ではそれぞれの方法で OpenBabel をインストールしてください。
 

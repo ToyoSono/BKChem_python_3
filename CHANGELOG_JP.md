@@ -7,6 +7,7 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 ## フォーク リリース 14 — 2026-11-22
 
 ### 追加（Added）
+- **OpenBabel / InChI の同梱**: `BKChem-portable-w-ob-inch.zip` には `OpenBabel 3.1.1` と `inchi-1.exe` が入っていて、Read SMILES / Read InChI と Generate InChI がインストールなしで使えます。
 
 - **OpenBabel と InChI プログラムをポータブル版に同梱できるようになりました**: `openbabel` フォルダ（インストール済み OpenBabel 3.1.1 のプログラムフォルダのコピー、`data` フォルダ込みで約 14.5 MB）と、`inchi-1.exe` を入れた `inchi` フォルダを `BKChem.exe` の隣（ソースコピーでは `start_bkchem.py` の隣）に置くと、パスの設定なしで、Read SMILES / Read InChI は同梱の OpenBabel を、Generate InChI は同梱の inchi-1 を使うようになります。解決順序は、設定済みのプログラムパス（ファイルが存在する場合）、同梱コピー、内蔵 oasa 経路の順で、Generate InChI メニューも同梱 inchi-1 がある場合は有効になります。Windows で確認済み（両フォルダを exe の隣に置いた PyInstaller ビルドを含む）。（`bkchem/oasa_bridge.py`、`bkchem/main.py`）
 
